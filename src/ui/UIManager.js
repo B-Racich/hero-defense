@@ -140,6 +140,13 @@ export class UIManager {
    * Set up UI event listeners
    */
   setupEventListeners() {
+    // Listen for chat messages from other players
+    if (this.game.networkManager && this.game.networkManager.events) {
+      this.game.networkManager.events.on('chatReceived', data => {
+        this.addChatMessage(data.playerId, data.message);
+      });
+    }
+
     // Hero selection
     if (this.elements.heroSelection) {
       const heroOptions = this.elements.heroSelection.querySelectorAll('.heroOption');
