@@ -138,6 +138,10 @@ export class Enemy {
    * @param {number} delta - Time since last update in seconds
    */
 
+  /**
+ * Update enemy logic
+ * @param {number} delta - Time since last update in seconds
+ */
   update(delta) {
     if (!this.mesh) return;
 
@@ -169,6 +173,10 @@ export class Enemy {
       if (this.game && this.game.state && this.game.state.hero) {
         // Deal damage equal to enemy's damage stat
         const damageToHero = this.damage;
+
+        this.logger.info(`Enemy ${this.id} reached end zone - dealing ${damageToHero} damage to hero`);
+
+        // Apply damage directly to hero
         this.game.state.hero.takeDamage(damageToHero, this);
 
         // Create floating damage text
@@ -180,8 +188,18 @@ export class Enemy {
           );
         }
 
-        // Remove enemy
-        this.game.sceneManager.removeFromScene(this.mesh);
+        // Update wave system for wave completion
+        if (this.game.waveSystem) {
+          this.game.waveSystem.waveEnemiesLeft = Math.max(0, this.game.waveSystem.waveEnemiesLeft - 1);
+          this.game.waveSystem.checkWaveCompletion();
+        }
+
+        // Remove from scene
+        if (this.game.sceneManager) {
+          this.game.sceneManager.removeFromScene(this.mesh);
+        }
+
+        // Remove from state
         const index = this.game.state.enemies.indexOf(this);
         if (index !== -1) {
           this.game.state.enemies.splice(index, 1);
@@ -192,7 +210,6 @@ export class Enemy {
     // Update effects
     this.updateEffects(delta);
   }
-
   /**
    * Update active status effects
    * @param {number} delta - Time since last update in seconds

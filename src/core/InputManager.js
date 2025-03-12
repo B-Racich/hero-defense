@@ -63,6 +63,14 @@ export class InputManager {
    * @param {MouseEvent} event - Mouse down event
    */
   onMouseDown(event) {
+    // Check if the click was on a UI element
+    const isUIClick = event.target.closest('.ui-panel') !== null;
+    
+    // If it's a UI click, don't emit the mousedown event
+    if (isUIClick) {
+      return;
+    }
+    
     // Emit event with mouse data
     this.events.emit('mousedown', {
       button: event.button,

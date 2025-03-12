@@ -434,21 +434,6 @@ export class UIManager {
     healthContainer.appendChild(healthValue);
     panel.appendChild(healthContainer);
 
-    // FPS counter
-    const fpsContainer = document.createElement('div');
-    fpsContainer.className = 'info-row';
-
-    const fpsLabel = document.createElement('span');
-    fpsLabel.textContent = 'FPS: ';
-
-    const fpsValue = document.createElement('span');
-    fpsValue.id = 'fpsValue';
-    fpsValue.textContent = '0';
-
-    fpsContainer.appendChild(fpsLabel);
-    fpsContainer.appendChild(fpsValue);
-    panel.appendChild(fpsContainer);
-
     // Add to game container
     this.elements.gameContainer.appendChild(panel);
 

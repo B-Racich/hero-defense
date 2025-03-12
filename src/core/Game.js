@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import { QualityController } from '../utils/QualityController.js';
+
 import { Engine } from './Engine.js';
 import { SceneManager } from './SceneManager.js';
 import { AssetLoader } from './AssetLoader.js';
@@ -56,7 +58,8 @@ export class Game {
     this.sceneManager.game = this;
     this.geometryPool = new GeometryPool();
     this.materialPool = new MaterialPool();
-
+    // Quality controller
+    this.qualityController = new QualityController(this);
     // Factories
     this.heroFactory = new HeroFactory(this);
 
@@ -103,7 +106,10 @@ export class Game {
 
     try {
 
-      this.enablePerformanceMode();
+      // Initialize quality controller first
+      this.qualityController.initialize('medium');
+
+      // this.enablePerformanceMode();
 
       this.geometryPool = new GeometryPool();
       this.materialPool = new MaterialPool();
@@ -200,8 +206,9 @@ export class Game {
     const scaledDelta = this.clock.delta * this.state.timeScale;
 
     // Add update frequency control for systems
-    const PHYSICS_UPDATE_FREQUENCY = 2; // Physics updates every 2 frames
-    const ENEMY_UPDATE_FREQUENCY = 3; // Enemy AI updates every 3 frames
+    // Get update frequencies from quality settings
+    const PHYSICS_UPDATE_FREQUENCY = this.state.physicsUpdateFrequency || 2;
+    const ENEMY_UPDATE_FREQUENCY = this.state.enemyUpdateFrequency || 3;
 
     // Always update core systems
     this.renderSystem.render();
