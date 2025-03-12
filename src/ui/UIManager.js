@@ -133,6 +133,14 @@ export class UIManager {
       this.elements.loadingScreen.style.display = 'none';
     } else {
       this.logger.warn('Loading screen element not found when trying to hide');
+      // Try to find it directly in the document
+      const loadingScreen = document.getElementById('loadingScreen');
+      if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        loadingScreen.style.display = 'none';
+        this.elements.loadingScreen = loadingScreen;
+        this.logger.info('Found and hid loading screen directly');
+      }
     }
   }
 
@@ -568,128 +576,6 @@ export class UIManager {
   }
 
   /**
-   * Create multiplayer panel
-   * @returns {HTMLElement} Multiplayer panel
-   */
-  createMultiplayerPanel() {
-    const panel = document.createElement('div');
-    panel.id = 'multiplayerPanel';
-    panel.className = 'ui-panel';
-
-    // Title
-    const title = document.createElement('h2');
-    title.textContent = 'Hero Defense';
-    panel.appendChild(title);
-
-    // Server input
-    const serverContainer = document.createElement('div');
-    serverContainer.className = 'input-container';
-
-    const serverLabel = document.createElement('label');
-    serverLabel.textContent = 'Server:';
-
-    const serverInput = document.createElement('input');
-    serverInput.type = 'text';
-    serverInput.className = 'serverInput';
-    serverInput.value = 'ws://localhost:3001';
-
-    serverContainer.appendChild(serverLabel);
-    serverContainer.appendChild(serverInput);
-    panel.appendChild(serverContainer);
-
-    // Room input (for joining)
-    const roomContainer = document.createElement('div');
-    roomContainer.className = 'input-container';
-
-    const roomLabel = document.createElement('label');
-    roomLabel.textContent = 'Room ID:';
-
-    const roomInput = document.createElement('input');
-    roomInput.type = 'text';
-    roomInput.className = 'roomInput';
-    roomInput.placeholder = 'Enter room ID to join';
-
-    roomContainer.appendChild(roomLabel);
-    roomContainer.appendChild(roomInput);
-    panel.appendChild(roomContainer);
-
-    // Room info (shown after creation)
-    const roomInfo = document.createElement('div');
-    roomInfo.id = 'roomInfo';
-    roomInfo.style.display = 'none';
-
-    const roomIdDisplay = document.createElement('div');
-    roomIdDisplay.className = 'room-id-display';
-
-    const roomIdLabel = document.createElement('span');
-    roomIdLabel.textContent = 'Room ID: ';
-
-    const roomIdValue = document.createElement('span');
-    roomIdValue.id = 'roomIdValue';
-    roomIdValue.className = 'room-id-value';
-
-    roomIdDisplay.appendChild(roomIdLabel);
-    roomIdDisplay.appendChild(roomIdValue);
-    roomInfo.appendChild(roomIdDisplay);
-
-    // Copy button
-    const copyButton = document.createElement('button');
-    copyButton.textContent = 'Copy ID';
-    copyButton.addEventListener('click', () => {
-      const roomId = document.getElementById('roomIdValue').textContent;
-      navigator.clipboard.writeText(roomId)
-        .then(() => {
-          copyButton.textContent = 'Copied!';
-          setTimeout(() => {
-            copyButton.textContent = 'Copy ID';
-          }, 2000);
-        })
-        .catch(err => {
-          console.error('Failed to copy room ID:', err);
-        });
-    });
-
-    roomInfo.appendChild(copyButton);
-    panel.appendChild(roomInfo);
-
-    // Buttons container
-    const buttonsContainer = document.createElement('div');
-    buttonsContainer.className = 'buttons-container';
-
-    // Create game button
-    const createButton = document.createElement('button');
-    createButton.className = 'createButton';
-    createButton.textContent = 'Create Game';
-    buttonsContainer.appendChild(createButton);
-
-    // Join game button
-    const joinButton = document.createElement('button');
-    joinButton.className = 'joinButton';
-    joinButton.textContent = 'Join Game';
-    buttonsContainer.appendChild(joinButton);
-
-    // Play solo button
-    const soloButton = document.createElement('button');
-    soloButton.className = 'soloButton';
-    soloButton.textContent = 'Play Solo';
-    buttonsContainer.appendChild(soloButton);
-
-    panel.appendChild(buttonsContainer);
-
-    // Error message display
-    const errorDisplay = document.createElement('div');
-    errorDisplay.id = 'errorDisplay';
-    errorDisplay.className = 'error-message';
-    errorDisplay.style.display = 'none';
-    panel.appendChild(errorDisplay);
-
-    // Add to game container
-    this.elements.gameContainer.appendChild(panel);
-
-    return panel;
-  }
-
-  /**
    * Create player list panel
    * @returns {HTMLElement} Player list panel
    */
@@ -968,7 +854,6 @@ export class UIManager {
   /**
    * Show multiplayer panel
    */
-  // In showMultiplayerPanel method (around line 950)
   showMultiplayerPanel() {
     this.logger.info('Showing multiplayer panel');
 
@@ -992,6 +877,156 @@ export class UIManager {
     if (this.elements.multiplayerPanel) {
       this.elements.multiplayerPanel.style.display = 'block';
     }
+  }
+
+  /**
+   * Create simplified multiplayer panel
+   * @returns {HTMLElement} Multiplayer panel
+   */
+  createSimplifiedMultiplayerPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'multiplayerPanel';
+    panel.className = 'ui-panel';
+    panel.style.position = 'fixed';
+    panel.style.top = '50%';
+    panel.style.left = '50%';
+    panel.style.transform = 'translate(-50%, -50%)';
+    panel.style.width = '400px';
+    panel.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    panel.style.padding = '20px';
+    panel.style.borderRadius = '10px';
+    panel.style.zIndex = '1000';
+    panel.style.color = 'white';
+    panel.style.textAlign = 'center';
+
+    // Title
+    const title = document.createElement('h2');
+    title.textContent = 'Hero Defense';
+    title.style.marginBottom = '20px';
+    panel.appendChild(title);
+
+    // Server input
+    const serverLabel = document.createElement('div');
+    serverLabel.textContent = 'Server:';
+    serverLabel.style.textAlign = 'left';
+    serverLabel.style.marginBottom = '5px';
+    panel.appendChild(serverLabel);
+
+    const serverInput = document.createElement('input');
+    serverInput.className = 'serverInput';
+    serverInput.value = 'ws://localhost:3001';
+    serverInput.style.width = '100%';
+    serverInput.style.padding = '8px';
+    serverInput.style.marginBottom = '15px';
+    serverInput.style.borderRadius = '5px';
+    serverInput.style.border = 'none';
+    panel.appendChild(serverInput);
+
+    // Room input
+    const roomLabel = document.createElement('div');
+    roomLabel.textContent = 'Room ID (for joining):';
+    roomLabel.style.textAlign = 'left';
+    roomLabel.style.marginBottom = '5px';
+    panel.appendChild(roomLabel);
+
+    const roomInput = document.createElement('input');
+    roomInput.className = 'roomInput';
+    roomInput.placeholder = 'Enter room ID to join';
+    roomInput.style.width = '100%';
+    roomInput.style.padding = '8px';
+    roomInput.style.marginBottom = '15px';
+    roomInput.style.borderRadius = '5px';
+    roomInput.style.border = 'none';
+    panel.appendChild(roomInput);
+
+    // Buttons
+    const createButton = document.createElement('button');
+    createButton.className = 'createButton';
+    createButton.textContent = 'Create Game';
+    createButton.style.display = 'block';
+    createButton.style.width = '100%';
+    createButton.style.padding = '10px';
+    createButton.style.margin = '10px 0';
+    createButton.style.backgroundColor = '#4299e1';
+    createButton.style.color = 'white';
+    createButton.style.border = 'none';
+    createButton.style.borderRadius = '5px';
+    createButton.style.cursor = 'pointer';
+    panel.appendChild(createButton);
+
+    const joinButton = document.createElement('button');
+    joinButton.className = 'joinButton';
+    joinButton.textContent = 'Join Game';
+    joinButton.style.display = 'block';
+    joinButton.style.width = '100%';
+    joinButton.style.padding = '10px';
+    joinButton.style.margin = '10px 0';
+    joinButton.style.backgroundColor = '#4299e1';
+    joinButton.style.color = 'white';
+    joinButton.style.border = 'none';
+    joinButton.style.borderRadius = '5px';
+    joinButton.style.cursor = 'pointer';
+    panel.appendChild(joinButton);
+
+    const soloButton = document.createElement('button');
+    soloButton.className = 'soloButton';
+    soloButton.textContent = 'Play Solo';
+    soloButton.style.display = 'block';
+    soloButton.style.width = '100%';
+    soloButton.style.padding = '10px';
+    soloButton.style.margin = '10px 0';
+    soloButton.style.backgroundColor = '#4299e1';
+    soloButton.style.color = 'white';
+    soloButton.style.border = 'none';
+    soloButton.style.borderRadius = '5px';
+    soloButton.style.cursor = 'pointer';
+    panel.appendChild(soloButton);
+
+    // Error display
+    const errorDisplay = document.createElement('div');
+    errorDisplay.id = 'errorDisplay';
+    errorDisplay.style.color = '#ff6b6b';
+    errorDisplay.style.marginTop = '15px';
+    errorDisplay.style.display = 'none';
+    panel.appendChild(errorDisplay);
+
+    // Room info (shown after creation)
+    const roomInfo = document.createElement('div');
+    roomInfo.id = 'roomInfo';
+    roomInfo.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+    roomInfo.style.padding = '10px';
+    roomInfo.style.marginTop = '15px';
+    roomInfo.style.borderRadius = '5px';
+    roomInfo.style.display = 'none';
+
+    const roomIdDisplay = document.createElement('div');
+    const roomIdLabel = document.createElement('span');
+    roomIdLabel.textContent = 'Room ID: ';
+    const roomIdValue = document.createElement('span');
+    roomIdValue.id = 'roomIdValue';
+    roomIdValue.style.fontWeight = 'bold';
+
+    roomIdDisplay.appendChild(roomIdLabel);
+    roomIdDisplay.appendChild(roomIdValue);
+    roomInfo.appendChild(roomIdDisplay);
+
+    const copyButton = document.createElement('button');
+    copyButton.textContent = 'Copy ID';
+    copyButton.style.padding = '5px 10px';
+    copyButton.style.marginTop = '10px';
+    copyButton.style.backgroundColor = '#4299e1';
+    copyButton.style.color = 'white';
+    copyButton.style.border = 'none';
+    copyButton.style.borderRadius = '5px';
+    copyButton.style.cursor = 'pointer';
+    roomInfo.appendChild(copyButton);
+
+    panel.appendChild(roomInfo);
+
+    // Append to document directly for maximum visibility
+    document.body.appendChild(panel);
+
+    return panel;
   }
 
   /**
@@ -1093,7 +1128,7 @@ export class UIManager {
     // Update upgrade buttons
     this.updateUpgradeButtons();
 
-    // In the updateGameUI method, add this line:
+    // Update FPS display
     this.updateFpsUI(this.game.fps || 0);
   }
 
@@ -1254,32 +1289,6 @@ export class UIManager {
         button.disabled = this.game.state.gold < cost;
       }
     });
-  }
-
-  // Fix createSimplifiedMultiplayerPanel method (around line 1311)
-  createSimplifiedMultiplayerPanel() {
-    const panel = document.createElement('div');
-    panel.id = 'multiplayerPanel';
-    panel.className = 'ui-panel';
-
-    // Create panel content (keep existing code)
-    // ...
-
-    // Fix the appendChild error with a safety check
-    if (this.elements.gameContainer) {
-      this.elements.gameContainer.appendChild(panel);
-    } else {
-      // If gameContainer doesn't exist, find or create it
-      this.elements.gameContainer = document.getElementById('gameContainer');
-      if (!this.elements.gameContainer) {
-        this.elements.gameContainer = document.createElement('div');
-        this.elements.gameContainer.id = 'gameContainer';
-        document.body.appendChild(this.elements.gameContainer);
-      }
-      this.elements.gameContainer.appendChild(panel);
-    }
-
-    return panel;
   }
 
   /**

@@ -105,6 +105,9 @@ export class Game {
   async initialize() {
     this.logger.info('Initializing game');
 
+// Add immediately after initialize() starts in Game.js
+document.getElementById('loadingScreen').style.display = 'none';
+
     try {
       this.geometryPool = new GeometryPool();
       this.materialPool = new MaterialPool();
