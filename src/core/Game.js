@@ -77,23 +77,23 @@ export class Game {
     this.logger.info('Game instance created');
   }
 
-// Add this new method to Game.js
-enablePerformanceMode() {
-  // Set performance configuration
-  this.state.performanceMode = true;
-  
-  // Reduce particle counts and effect quality
-  this.state.particleMultiplier = 0.5; // 50% of normal particles
-  
-  // Set update frequencies
-  this.state.physicsUpdateFrequency = 2; // Every 2 frames
-  this.state.enemyUpdateFrequency = 3; // Every 3 frames
-  
-  // Initialize frame counter
-  this.frameCount = 0;
-  
-  this.logger.info('Performance mode enabled');
-}
+  // Add this new method to Game.js
+  enablePerformanceMode() {
+    // Set performance configuration
+    this.state.performanceMode = true;
+
+    // Reduce particle counts and effect quality
+    this.state.particleMultiplier = 0.5; // 50% of normal particles
+
+    // Set update frequencies
+    this.state.physicsUpdateFrequency = 2; // Every 2 frames
+    this.state.enemyUpdateFrequency = 3; // Every 3 frames
+
+    // Initialize frame counter
+    this.frameCount = 0;
+
+    this.logger.info('Performance mode enabled');
+  }
 
   /**
    * Initialize game systems and start the game loop
