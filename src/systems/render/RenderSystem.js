@@ -387,9 +387,6 @@ export class RenderSystem {
     this.updateFps();
   }
   
-  /**
-   * Update FPS counter
-   */
   updateFps() {
     this.frameCount++;
     
@@ -401,8 +398,8 @@ export class RenderSystem {
       this.frameCount = 0;
       this.lastFpsUpdate = now;
       
-      // Optionally display FPS
-      // console.log(`FPS: ${this.fps}`);
+      // Simply expose FPS as a property of RenderSystem
+      // Don't try to set it on game object
     }
   }
   

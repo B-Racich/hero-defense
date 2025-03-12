@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 /**
  * Simple event emitter implementation
  */

@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 import { Warrior } from './Warrior.js';
 import { Ranger } from './Ranger.js';
 import { Mage } from './Mage.js';

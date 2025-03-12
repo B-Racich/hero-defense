@@ -68,12 +68,12 @@ export class SceneManager {
     document.body.insertBefore(this.renderer.domElement, document.body.firstChild);
     
     // Add a test object to confirm rendering works
-    const testGeometry = new THREE.BoxGeometry(2, 2, 2);
-    const testMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-    const testCube = new THREE.Mesh(testGeometry, testMaterial);
-    testCube.position.set(0, 5, 0);
-    this.scene.add(testCube);
-    this.logger.info('Added test cube to scene');
+    // const testGeometry = new THREE.BoxGeometry(2, 2, 2);
+    // const testMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    // const testCube = new THREE.Mesh(testGeometry, testMaterial);
+    // testCube.position.set(0, 5, 0);
+    // this.scene.add(testCube);
+    // this.logger.info('Added test cube to scene');
     
     // Set up lighting
     this.setupLighting();
