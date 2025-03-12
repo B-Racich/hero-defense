@@ -1,5 +1,6 @@
 import { Logger } from '../utils/Logger.js';
 import { EventEmitter } from '../utils/EventEmitter.js';
+import * as THREE from 'three';
 
 /**
  * Manages network communications for multiplayer functionality
@@ -32,6 +33,27 @@ export class NetworkManager {
 
     this.logger.info('Network manager created');
   }
+
+  // Add after the constructor in NetworkManager.js
+debugEntities() {
+  console.log("--- DEBUG ENTITIES ---");
+  console.log(`Hero exists: ${!!this.game.state.hero}`);
+  if (this.game.state.hero && this.game.state.hero.mesh) {
+    console.log(`Hero mesh exists: ${!!this.game.state.hero.mesh}`);
+    console.log(`Hero position: ${JSON.stringify(this.game.state.hero.position)}`);
+    console.log(`Hero in scene: ${this.game.sceneManager.scene.children.includes(this.game.state.hero.mesh)}`);
+  }
+  
+  console.log(`Enemies count: ${this.game.state.enemies.length}`);
+  this.game.state.enemies.forEach((enemy, i) => {
+    console.log(`Enemy ${i} mesh exists: ${!!enemy.mesh}`);
+    if (enemy.mesh) {
+      console.log(`Enemy ${i} in scene: ${this.game.sceneManager.scene.children.includes(enemy.mesh)}`);
+    }
+  });
+  
+  console.log(`Scene total children: ${this.game.sceneManager.scene.children.length}`);
+}
 
   /**
    * Initialize the network manager
@@ -100,18 +122,19 @@ export class NetworkManager {
   /**
    * Register player with the server
    */
-  registerPlayer() {
+  // Change to registerPlayer method around line 110
+  registerPlayer(username) {
     if (!this.connected) {
       this.logger.error('Not connected, cannot register player');
       return;
     }
 
     this.logger.info('Registering player with server');
+    this.username = username;
 
     this.send({
       type: 'register_player',
-      playerId: this.playerId,
-      heroClass: this.game.state.heroClass
+      username: username
     });
   }
 
@@ -218,17 +241,41 @@ export class NetworkManager {
           this.logger.error(`Server error: ${message.message}`);
           this.events.emit('error', { message: message.message });
           break;
-        // src/network/NetworkManager.js - Around line 220
+        // Replace the enemy_spawn case in handleMessage method in NetworkManager.js
         case 'enemy_spawn':
           // Create enemy locally based on server data
-          if (this.game.waveSystem && this.game.waveSystem.enemyFactory) {
-            const enemy = this.game.waveSystem.enemyFactory.createEnemy(message.enemyType, {
-              id: message.enemyId,
-              position: message.position
-            });
+          if (this.game && this.game.state) {
+            const position = new THREE.Vector3(
+              message.position.x || 0,
+              message.position.y || 0.4,
+              message.position.z || 0
+            );
 
-            if (enemy) {
-              this.game.state.enemies.push(enemy);
+            // Use the enemy factory from the game's waveSystem
+            if (this.game.waveSystem && this.game.waveSystem.enemyFactory) {
+              const enemy = this.game.waveSystem.enemyFactory.createEnemy(message.enemyType, {
+                id: message.enemyId,
+                position: position,
+                health: message.health
+              });
+
+              if (enemy) {
+                // Make sure mesh is created and added to scene
+                if (!enemy.mesh) {
+                  enemy.mesh = enemy.createMesh();
+                  this.game.sceneManager.addToScene(enemy.mesh, 'enemies');
+                }
+
+                this.game.state.enemies.push(enemy);
+                console.log(`Enemy spawned: ${message.enemyType} (${message.enemyId})`);
+
+                // Debug entities
+                this.debugEntities();
+              } else {
+                console.error("Failed to create enemy");
+              }
+            } else {
+              console.error("Enemy factory not available");
             }
           }
           break;
@@ -250,6 +297,52 @@ export class NetworkManager {
               this.game.sceneManager.removeFromScene(removedEnemy.mesh);
             }
             this.game.state.enemies.splice(enemyIndex, 1);
+          }
+          break;
+        case 'server_damaged':
+          this.logger.info(`Server damaged: -${message.damage} (${message.health} remaining)`);
+
+          // Update UI with server health
+          if (this.game && this.game.uiManager) {
+            this.game.uiManager.updateHealthUI(message.health);
+          }
+
+          this.events.emit('serverDamaged', {
+            health: message.health,
+            damage: message.damage
+          });
+          break;
+
+        // Add handling for countdown messages
+        case 'countdown_started':
+        case 'countdown_update':
+          if (this.game && this.game.uiManager) {
+            this.game.uiManager.showCountdown(message.countdown);
+          }
+          break;
+
+        case 'wave_started':
+          if (this.game && this.game.uiManager) {
+            this.game.uiManager.updateWaveUI(message.wave);
+            this.game.uiManager.showWaveAnnouncement(message.wave);
+          }
+          break;
+
+        case 'wave_completed':
+          if (this.game && this.game.uiManager) {
+            this.game.uiManager.showWaveCompleted(message.nextWave);
+          }
+          break;
+
+        case 'game_over':
+          if (this.game) {
+            this.game.gameOver(message.wave);
+          }
+          break;
+
+        case 'game_reset':
+          if (this.game) {
+            this.game.resetGame();
           }
           break;
 

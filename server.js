@@ -7,13 +7,17 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Single global game state
+// Global game state
 const gameState = {
   wave: 1,
-  enemies: [], // This will now store enemy positions and data
-  gameActive: true,
+  enemies: [],
+  nextEnemyId: 1,
   players: {},
-  nextEnemyId: 1
+  serverHealth: 500, // Server health instead of hero health
+  gameActive: false,
+  countdown: 0,
+  resetTimeout: null,
+  waveTimeout: null
 };
 
 // Connection handling
@@ -26,15 +30,16 @@ wss.on('connection', (ws) => {
 
       switch (data.type) {
         case 'register_player':
-          playerId = data.playerId || 'player_' + Math.random().toString(36).substring(2, 9);
-
+          playerId = data.username || 'player_' + Math.random().toString(36).substring(2, 9);
+          
           // Add player to game
           gameState.players[playerId] = {
             ws,
             lastSeen: Date.now(),
-            heroClass: data.heroClass || null
+            username: data.username
           };
 
+          // Acknowledge registration
           ws.send(JSON.stringify({
             type: 'player_registered',
             playerId: playerId,
@@ -51,42 +56,36 @@ wss.on('connection', (ws) => {
           // Send current game state to new player
           ws.send(JSON.stringify({
             type: 'game_state',
-            state: gameState
+            state: {
+              wave: gameState.wave,
+              serverHealth: gameState.serverHealth,
+              gameActive: gameState.gameActive,
+              countdown: gameState.countdown
+            }
           }));
+
+          // Start game if not already running
+          if (!gameState.gameActive && Object.keys(gameState.players).length === 1) {
+            startGame();
+          }
           break;
 
-        case 'game_state':
-          // Update game state
-          gameState.wave = data.state.wave || gameState.wave;
-          gameState.enemies = data.state.enemies || gameState.enemies;
-          gameState.gameActive = data.state.gameActive !== undefined ? data.state.gameActive : gameState.gameActive;
-
-          // Broadcast to other players
-          broadcastToAll({
-            type: 'game_state',
-            state: gameState
-          }, [playerId]);
-          break;
-
-        case 'player_update':
-          if (!playerId) return;
-
-          // Update player's last seen timestamp
-          if (gameState.players[playerId]) {
-            gameState.players[playerId].lastSeen = Date.now();
-
-            // Update hero class if provided
-            if (data.data && data.data.heroClass) {
-              gameState.players[playerId].heroClass = data.data.heroClass;
+        case 'attack_enemy':
+          if (data.enemyId) {
+            const enemy = gameState.enemies.find(e => e.id === data.enemyId);
+            if (enemy) {
+              enemy.health -= data.damage || 10;
+              if (enemy.health <= 0) {
+                removeEnemy(enemy.id);
+              } else {
+                broadcastToAll({
+                  type: 'enemy_damaged',
+                  enemyId: enemy.id,
+                  health: enemy.health
+                }, []);
+              }
             }
           }
-
-          // Broadcast player update to other players
-          broadcastToAll({
-            type: 'player_update',
-            playerId: playerId,
-            data: data.data
-          }, [playerId]);
           break;
 
         case 'chat':
@@ -96,23 +95,9 @@ wss.on('connection', (ws) => {
           broadcastToAll({
             type: 'chat',
             playerId: playerId,
+            username: gameState.players[playerId].username,
             message: data.message
           }, []);
-          break;
-        case 'enemy_update':
-          if (data.id) {
-            updateEnemyPosition(data.id, data.position);
-          }
-          break;
-
-        // server.js - Around line 100
-        case 'spawn_enemy':
-          const enemyId = spawnEnemy(data.enemyType, data.position);  // Changed from data.type to data.enemyType
-          // Response is handled by broadcast
-          break;
-
-        case 'remove_enemy':
-          removeEnemy(data.id);
           break;
       }
     } catch (error) {
@@ -131,19 +116,116 @@ wss.on('connection', (ws) => {
         playerId: playerId,
         playerCount: Object.keys(gameState.players).length
       }, []);
+
+      // Check if all players have left
+      if (Object.keys(gameState.players).length === 0) {
+        resetGame(true); // Reset but don't start until a player joins
+      }
     }
   });
 });
 
-// Spawn an enemy
-function spawnEnemy(type, position) {
+function startGame() {
+  // Clear any existing reset timeout
+  if (gameState.resetTimeout) {
+    clearTimeout(gameState.resetTimeout);
+    gameState.resetTimeout = null;
+  }
+
+  // Set countdown for 5 seconds
+  gameState.countdown = 5;
+  gameState.gameActive = false;
+
+  // Broadcast countdown start
+  broadcastToAll({
+    type: 'countdown_started',
+    countdown: gameState.countdown
+  }, []);
+
+  // Update countdown every second
+  const countdownInterval = setInterval(() => {
+    gameState.countdown--;
+    
+    broadcastToAll({
+      type: 'countdown_update',
+      countdown: gameState.countdown
+    }, []);
+
+    if (gameState.countdown <= 0) {
+      clearInterval(countdownInterval);
+      
+      // Start the actual game
+      gameState.gameActive = true;
+      gameState.wave = 1;
+      gameState.serverHealth = 500;
+      gameState.enemies = [];
+      
+      broadcastToAll({
+        type: 'game_started',
+        wave: gameState.wave,
+        serverHealth: gameState.serverHealth
+      }, []);
+      
+      // Start first wave
+      startWave(gameState.wave);
+    }
+  }, 1000);
+}
+
+function startWave(waveNumber) {
+  // Simple wave configuration
+  const enemyCount = 5 + (waveNumber * 2);
+  const spawnInterval = Math.max(1000, 2000 - (waveNumber * 100));
+  
+  broadcastToAll({
+    type: 'wave_started',
+    wave: waveNumber
+  }, []);
+  
+  // Spawn enemies at intervals
+  let enemiesSpawned = 0;
+  const spawnEnemy = () => {
+    if (enemiesSpawned < enemyCount && gameState.gameActive) {
+      const enemyType = getRandomEnemyType(waveNumber);
+      spawnSingleEnemy(enemyType);
+      enemiesSpawned++;
+      
+      // Schedule next spawn
+      if (enemiesSpawned < enemyCount) {
+        gameState.waveTimeout = setTimeout(spawnEnemy, spawnInterval);
+      } else {
+        // Check if wave is complete (all enemies defeated)
+        checkWaveComplete();
+      }
+    }
+  };
+  
+  // Start spawning
+  spawnEnemy();
+}
+
+function getRandomEnemyType(wave) {
+  const types = ['grunt', 'scout', 'brute', 'mage', 'assassin', 'commander'];
+  const availableTypes = types.slice(0, Math.min(types.length, 1 + Math.floor(wave / 2)));
+  return availableTypes[Math.floor(Math.random() * availableTypes.length)];
+}
+
+function spawnSingleEnemy(type) {
   const enemyId = `enemy_${gameState.nextEnemyId++}`;
+  const health = getEnemyHealth(type);
+  const position = {
+    x: Math.random() * 3 - 1.5,
+    y: 0.4,
+    z: -12
+  };
 
   gameState.enemies.push({
     id: enemyId,
     type: type,
     position: position,
-    health: getEnemyHealth(type),
+    health: health,
+    damage: getEnemyDamage(type),
+    speed: getEnemySpeed(type),
     lastUpdated: Date.now()
   });
 
@@ -152,16 +234,12 @@ function spawnEnemy(type, position) {
     type: 'enemy_spawn',
     enemyId: enemyId,
     enemyType: type,
-    position: position
+    position: position,
+    health: health
   }, []);
-
-  return enemyId;
 }
 
-// server.js - Add near other utility functions
-// Helper function to get enemy health
 function getEnemyHealth(type) {
-  // Default values for enemy types
   const healthMap = {
     grunt: 30,
     scout: 20,
@@ -170,27 +248,33 @@ function getEnemyHealth(type) {
     assassin: 25,
     commander: 100
   };
-  
-  return healthMap[type] || 30; // Default to 30 health
+  return healthMap[type] || 30;
 }
 
-// Update enemy position
-function updateEnemyPosition(enemyId, position) {
-  const enemy = gameState.enemies.find(e => e.id === enemyId);
-  if (enemy) {
-    enemy.position = position;
-    enemy.lastUpdated = Date.now();
-
-    // Broadcast position update to all players
-    broadcastToAll({
-      type: 'enemy_position',
-      enemyId: enemyId,
-      position: position
-    }, []);
-  }
+function getEnemyDamage(type) {
+  const damageMap = {
+    grunt: 10,
+    scout: 5,
+    brute: 20,
+    mage: 15,
+    assassin: 25,
+    commander: 40
+  };
+  return damageMap[type] || 10;
 }
 
-// Remove an enemy
+function getEnemySpeed(type) {
+  const speedMap = {
+    grunt: 0.02,
+    scout: 0.04,
+    brute: 0.015,
+    mage: 0.025,
+    assassin: 0.05,
+    commander: 0.01
+  };
+  return speedMap[type] || 0.02;
+}
+
 function removeEnemy(enemyId) {
   const index = gameState.enemies.findIndex(e => e.id === enemyId);
   if (index !== -1) {
@@ -201,21 +285,105 @@ function removeEnemy(enemyId) {
       type: 'enemy_remove',
       enemyId: enemyId
     }, []);
+
+    // Check if wave is complete
+    checkWaveComplete();
   }
 }
 
-// Utility function to broadcast to all players
-function broadcastToAll(message, excludePlayers = []) {
-  const messageStr = JSON.stringify(message);
-
-  Object.entries(gameState.players).forEach(([id, player]) => {
-    if (!excludePlayers.includes(id) && player.ws.readyState === WebSocket.OPEN) {
-      player.ws.send(messageStr);
-    }
-  });
+function checkWaveComplete() {
+  // Wave is complete when all enemies are defeated
+  if (gameState.enemies.length === 0 && gameState.gameActive) {
+    // Small delay before starting next wave
+    setTimeout(() => {
+      if (gameState.gameActive) {
+        gameState.wave++;
+        broadcastToAll({
+          type: 'wave_completed',
+          nextWave: gameState.wave
+        }, []);
+        
+        // Start next wave
+        startWave(gameState.wave);
+      }
+    }, 3000);
+  }
 }
 
-// Clean up inactive players periodically
+function resetGame(waitForPlayers = false) {
+  // Clear any existing timeouts
+  if (gameState.waveTimeout) {
+    clearTimeout(gameState.waveTimeout);
+    gameState.waveTimeout = null;
+  }
+  
+  if (gameState.resetTimeout) {
+    clearTimeout(gameState.resetTimeout);
+    gameState.resetTimeout = null;
+  }
+
+  // Reset game state
+  gameState.gameActive = false;
+  gameState.wave = 1;
+  gameState.serverHealth = 500;
+  gameState.enemies = [];
+  
+  broadcastToAll({
+    type: 'game_reset'
+  }, []);
+  
+  // If there are players and we shouldn't wait, start a new game
+  if (Object.keys(gameState.players).length > 0 && !waitForPlayers) {
+    gameState.resetTimeout = setTimeout(() => {
+      startGame();
+    }, 5000);
+  }
+}
+
+// Update enemy positions and check for end zone collisions
+setInterval(() => {
+  if (!gameState.gameActive) return;
+  
+  gameState.enemies.forEach(enemy => {
+    // Move enemy forward
+    enemy.position.z += enemy.speed * 60;
+    
+    // Check if enemy reached end zone
+    if (enemy.position.z >= 12) {
+      // Damage the server
+      gameState.serverHealth -= enemy.damage;
+      
+      // Broadcast health update
+      broadcastToAll({
+        type: 'server_damaged',
+        health: gameState.serverHealth,
+        damage: enemy.damage
+      }, []);
+      
+      // Remove enemy
+      removeEnemy(enemy.id);
+      
+      // Check if game over
+      if (gameState.serverHealth <= 0) {
+        broadcastToAll({
+          type: 'game_over',
+          wave: gameState.wave
+        }, []);
+        
+        resetGame();
+      }
+    } else {
+      // Broadcast position update
+      broadcastToAll({
+        type: 'enemy_position',
+        enemyId: enemy.id,
+        position: enemy.position
+      }, []);
+    }
+  });
+}, 100);
+
+// Clean up inactive players
 setInterval(() => {
   const now = Date.now();
 
@@ -232,9 +400,25 @@ setInterval(() => {
         playerId: playerId,
         playerCount: Object.keys(gameState.players).length
       }, []);
+
+      // Check if all players have left
+      if (Object.keys(gameState.players).length === 0) {
+        resetGame(true);
+      }
     }
   });
 }, 10000);
+
+// Utility function to broadcast to all players
+function broadcastToAll(message, excludePlayers = []) {
+  const messageStr = JSON.stringify(message);
+
+  Object.entries(gameState.players).forEach(([id, player]) => {
+    if (!excludePlayers.includes(id) && player.ws.readyState === WebSocket.OPEN) {
+      player.ws.send(messageStr);
+    }
+  });
+}
 
 // Start server
 const PORT = process.env.PORT || 3001;

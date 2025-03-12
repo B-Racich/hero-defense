@@ -221,6 +221,10 @@ document.getElementById('loadingScreen').style.display = 'none';
       }
     }
 
+    if (this.state.enemies && this.state.enemies.length > 0) {
+      console.log(`Processing ${this.state.enemies.length} enemies`);
+    }
+
     // Other systems update normally
     this.waveSystem.update(scaledDelta);
     this.combatSystem.update(scaledDelta);

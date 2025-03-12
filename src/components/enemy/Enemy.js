@@ -47,58 +47,66 @@ export class Enemy {
    * Create the 3D mesh for the enemy
    * @returns {THREE.Group} The enemy mesh group
    */
-  // Near line 80 in Enemy.js
-  createMesh() {
-    // Get geometry and material pools from the game
-    const geometryPool = this.game.geometryPool;
-    const materialPool = this.game.materialPool;
-
-    // Create group to hold enemy components
-    const enemyGroup = new THREE.Group();
-    enemyGroup.position.copy(this.position);
-
-    // Get the appropriate geometry from the pool
-    let enemyGeometry;
+  // Add to src/components/enemy/Enemy.js in the createMesh method:
+createMesh() {
+  // Ensure we're using the geometry pool properly
+  let enemyGeometry;
+  if (this.game && this.game.geometryPool) {
     switch (this.shape) {
       case 'sphere':
-        enemyGeometry = geometryPool.getSphereGeometry(0.4);
+        enemyGeometry = this.game.geometryPool.getSphereGeometry(0.5 * this.scale);
         break;
       case 'tetrahedron':
-        enemyGeometry = geometryPool.getTetrahedronGeometry(0.5);
+        enemyGeometry = this.game.geometryPool.getTetrahedronGeometry(0.6 * this.scale);
         break;
       case 'cone':
-        enemyGeometry = geometryPool.getConeGeometry(0.4, 0.8, 8);
+        enemyGeometry = this.game.geometryPool.getConeGeometry(0.5 * this.scale, 0.8 * this.scale);
         break;
       case 'box':
       default:
-        enemyGeometry = geometryPool.getBoxGeometry(0.8, 0.8, 0.8);
+        enemyGeometry = this.game.geometryPool.getBoxGeometry(0.8 * this.scale, 0.8 * this.scale, 0.8 * this.scale);
     }
-
-    // Get material from pool instead of creating new ones
-    const enemyMaterial = materialPool.getStandardMaterial(this.color, 0.2, 0.7);
-
-    // Create main enemy mesh
-    const enemyMesh = new THREE.Mesh(enemyGeometry, enemyMaterial);
-    enemyMesh.castShadow = true;
-    enemyMesh.receiveShadow = true;
-    enemyGroup.add(enemyMesh);
-
-    // Scale enemy based on type
-    enemyGroup.scale.set(this.scale, this.scale, this.scale);
-
-    // Create health bar
-    const healthBarGroup = this.createHealthBar();
-    healthBarGroup.position.y = 1 * this.scale;
-    enemyGroup.add(healthBarGroup);
-
-    // Store reference to health bar
-    this.healthBar = healthBarGroup.children[0]; // The foreground bar
-
-    // Store reference to mesh
-    this.mesh = enemyGroup;
-
-    return enemyGroup;
+  } else {
+    // Fallback if geometry pool isn't available
+    enemyGeometry = new THREE.BoxGeometry(0.8 * this.scale, 0.8 * this.scale, 0.8 * this.scale);
   }
+
+  // Create brightly colored material for better visibility
+  const enemyMaterial = new THREE.MeshBasicMaterial({
+    color: this.color || 0xff0000,
+    wireframe: false
+  });
+
+  // Create main enemy mesh
+  const enemyMesh = new THREE.Mesh(enemyGeometry, enemyMaterial);
+  enemyMesh.castShadow = true;
+  enemyMesh.receiveShadow = true;
+
+  // Create group to hold enemy components
+  const enemyGroup = new THREE.Group();
+  
+  // Position at specified position, ensuring y is above ground
+  enemyGroup.position.copy(this.position);
+  if (enemyGroup.position.y < 0.4) {
+    enemyGroup.position.y = 0.4; // Force minimum height
+  }
+  
+  enemyGroup.add(enemyMesh);
+
+  // Add health bar
+  const healthBarGroup = this.createHealthBar();
+  healthBarGroup.position.y = 1.5 * this.scale;
+  enemyGroup.add(healthBarGroup);
+
+  // Store reference to mesh
+  this.mesh = enemyGroup;
+
+  // Add visual debugging aid - axis helper
+  const axisHelper = new THREE.AxesHelper(1);
+  enemyGroup.add(axisHelper);
+
+  return enemyGroup;
+}
 
   /**
    * Create a health bar for the enemy
@@ -145,26 +153,30 @@ export class Enemy {
   update(delta) {
     if (!this.mesh) return;
 
-    // Skip if in death animation
-    if (this.deathAnimationStarted) return;
-
-    // Update position based on speed
-    let currentSpeed = this.speed;
-
-    // Apply speed modifiers from effects
-    this.effects.forEach(effect => {
-      if (effect.type === 'slow' || effect.type === 'freeze') {
-        currentSpeed *= (1 - effect.slowFactor);
-      }
-    });
-
-    // Move enemy forward (in z direction)
-    this.mesh.position.z += currentSpeed * delta * 60; // Normalize for 60fps
+    // Force visibility
+    this.mesh.visible = true;
+    
+    // Ensure position is above ground
+    if (this.mesh.position.y < 0.4) {
+      this.mesh.position.y = 0.4;
+    }
+  
+    // Convert speed to be more noticeable for debugging
+    let adjustedSpeed = this.speed * 5; // Multiply speed for clearer movement
+    
+    // Move enemy forward with adjusted speed
+    this.mesh.position.z += adjustedSpeed * delta * 60;
     this.position.copy(this.mesh.position);
-
-    // Update health bar to face camera - Add safety checks
+  
+    // Update health bar to face camera
     if (this.healthBar && this.healthBar.parent && this.game && this.game.sceneManager && this.game.sceneManager.camera) {
       this.healthBar.parent.lookAt(this.game.sceneManager.camera.position);
+    }
+  
+    // Debug visualization - make enemy pulsate
+    if (this.mesh.children[0]) {
+      const pulseFactor = 1 + 0.2 * Math.sin(Date.now() / 200);
+      this.mesh.children[0].scale.set(pulseFactor, pulseFactor, pulseFactor);
     }
 
     // Check if enemy reached the end zone

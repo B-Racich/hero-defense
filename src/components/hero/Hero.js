@@ -267,30 +267,30 @@ export class Hero {
    */
   attack(enemy) {
     if (this.attackCooldown > 0) return false;
-
+  
     const distance = this.position.distanceTo(enemy.position);
     if (distance > this.upgradeStats.range.value) return false;
-
+  
     // Face the enemy
     const direction = new THREE.Vector3().subVectors(enemy.position, this.position);
     this.rotation.y = Math.atan2(direction.x, direction.z);
     if (this.mesh) this.mesh.rotation.y = this.rotation.y;
-
+  
     // Calculate damage
     let damage = this.upgradeStats.damage.value;
-
+  
     // Apply buffs
     this.buffs.forEach(buff => {
       if (buff.damageMultiplier) {
         damage *= buff.damageMultiplier;
       }
     });
-
+  
     // Check for critical hit
     let isCrit = false;
     let critChance = 0;
     let critDamage = 1.5; // Base crit damage is 50% extra
-
+  
     // Apply crit buffs
     this.buffs.forEach(buff => {
       if (buff.critChance) {
@@ -300,29 +300,35 @@ export class Hero {
         critDamage += buff.critDamage;
       }
     });
-
+  
     // Roll for crit
     if (critChance > 0 && Math.random() < critChance) {
       damage *= critDamage;
       isCrit = true;
     }
-
+  
     // Round final damage
     damage = Math.round(damage);
-
-    // Deal damage to enemy
-    enemy.takeDamage(damage, this, isCrit);
-
+  
+    // Send damage to server instead of applying directly
+    if (this.game && this.game.networkManager) {
+      this.game.networkManager.send({
+        type: 'attack_enemy',
+        enemyId: enemy.id,
+        damage: damage
+      });
+    }
+  
     // Reset attack cooldown
     this.attackCooldown = this.upgradeStats.attackSpeed.value;
-
+  
     // Emit attack event
     this.events.emit('attack', {
       target: enemy,
       damage: damage,
       isCrit: isCrit
     });
-
+  
     return true;
   }
 

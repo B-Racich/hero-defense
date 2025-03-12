@@ -289,3 +289,38 @@ body, html {
     cursor: pointer;
     display: inline-block;
 }
+
+.hero-options {
+    display: flex;
+    justify-content: space-between;
+    margin: 10px 0 20px;
+  }
+  
+  .hero-option {
+    width: 30%;
+    padding: 10px;
+    background-color: #2d3748;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .hero-option:hover, .hero-option.selected {
+    background-color: #4a5568;
+    transform: translateY(-5px);
+  }
+  
+  .hero-option input[type="radio"] {
+    margin-right: 5px;
+  }
+  
+  .hero-option label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 5px;
+  }
+  
+  .hero-option p {
+    font-size: 0.8rem;
+    margin: 5px 0 0;
+  }

@@ -1,5 +1,6 @@
 import { Logger } from '../utils/Logger.js';
 import { EventEmitter } from '../utils/EventEmitter.js';
+import * as THREE from 'three';
 
 /**
  * Manages game UI elements and interactions
@@ -27,6 +28,27 @@ export class UIManager {
     this.logger.info('UI manager created');
   }
 
+  // Add after the constructor in NetworkManager.js
+  debugEntities() {
+    console.log("--- DEBUG ENTITIES ---");
+    console.log(`Hero exists: ${!!this.game.state.hero}`);
+    if (this.game.state.hero && this.game.state.hero.mesh) {
+      console.log(`Hero mesh exists: ${!!this.game.state.hero.mesh}`);
+      console.log(`Hero position: ${JSON.stringify(this.game.state.hero.position)}`);
+      console.log(`Hero in scene: ${this.game.sceneManager.scene.children.includes(this.game.state.hero.mesh)}`);
+    }
+
+    console.log(`Enemies count: ${this.game.state.enemies.length}`);
+    this.game.state.enemies.forEach((enemy, i) => {
+      console.log(`Enemy ${i} mesh exists: ${!!enemy.mesh}`);
+      if (enemy.mesh) {
+        console.log(`Enemy ${i} in scene: ${this.game.sceneManager.scene.children.includes(enemy.mesh)}`);
+      }
+    });
+
+    console.log(`Scene total children: ${this.game.sceneManager.scene.children.length}`);
+  }
+
   /**
    * Initialize UI manager
    */
@@ -52,6 +74,32 @@ export class UIManager {
       this.showMultiplayerPanel();
       this.logger.info('Multiplayer panel should now be visible');
     }, 100);
+
+    // Add to the end of the initialize method in UIManager.js
+    // Create debug button
+    const debugButton = document.createElement('button');
+    debugButton.textContent = "Debug Game";
+    debugButton.style.position = 'fixed';
+    debugButton.style.top = '10px';
+    debugButton.style.left = '10px';
+    debugButton.style.zIndex = '9999';
+    debugButton.addEventListener('click', () => {
+      if (this.game && this.game.networkManager) {
+        this.game.networkManager.debugEntities();
+
+        // Force recreate hero if missing
+        if (!this.game.state.hero || !this.game.state.hero.mesh) {
+          console.log("Recreating hero...");
+          this.game.state.hero = this.game.heroFactory.createHero(this.game.state.heroClass || 'warrior', true);
+
+          // Make sure hero is added to scene
+          if (this.game.state.hero && this.game.state.hero.mesh) {
+            this.game.sceneManager.addToScene(this.game.state.hero.mesh, 'heroes');
+          }
+        }
+      }
+    });
+    document.body.appendChild(debugButton);
   }
 
   /**
@@ -799,6 +847,18 @@ export class UIManager {
    * Show game UI (after hero selection)
    */
   showGameUI() {
+    if (!this.elements.gameInfo) {
+      this.elements.gameInfo = this.createGameInfoPanel();
+    }
+
+    if (!this.elements.upgradePanel) {
+      this.elements.upgradePanel = this.createUpgradePanel();
+    }
+
+    if (!this.elements.abilityBar) {
+      this.elements.abilityBar = this.createAbilityBar();
+    }
+
     // Force hide loading screen
     this.hideLoadingScreen();
 
@@ -883,150 +943,280 @@ export class UIManager {
    * Create simplified multiplayer panel
    * @returns {HTMLElement} Multiplayer panel
    */
+  // In src/ui/UIManager.js, update the createSimplifiedMultiplayerPanel method
   createSimplifiedMultiplayerPanel() {
     const panel = document.createElement('div');
     panel.id = 'multiplayerPanel';
     panel.className = 'ui-panel';
-    panel.style.position = 'fixed';
-    panel.style.top = '50%';
-    panel.style.left = '50%';
-    panel.style.transform = 'translate(-50%, -50%)';
-    panel.style.width = '400px';
-    panel.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-    panel.style.padding = '20px';
-    panel.style.borderRadius = '10px';
-    panel.style.zIndex = '1000';
-    panel.style.color = 'white';
-    panel.style.textAlign = 'center';
 
     // Title
     const title = document.createElement('h2');
     title.textContent = 'Hero Defense';
-    title.style.marginBottom = '20px';
     panel.appendChild(title);
 
+    // Username input
+    const usernameContainer = document.createElement('div');
+    usernameContainer.className = 'input-container';
+
+    const usernameLabel = document.createElement('label');
+    usernameLabel.textContent = 'Username:';
+
+    const usernameInput = document.createElement('input');
+    usernameInput.type = 'text';
+    usernameInput.className = 'usernameInput';
+    usernameInput.placeholder = 'Enter your username';
+
+    usernameContainer.appendChild(usernameLabel);
+    usernameContainer.appendChild(usernameInput);
+    panel.appendChild(usernameContainer);
+
     // Server input
-    const serverLabel = document.createElement('div');
+    const serverContainer = document.createElement('div');
+    serverContainer.className = 'input-container';
+
+    const serverLabel = document.createElement('label');
     serverLabel.textContent = 'Server:';
-    serverLabel.style.textAlign = 'left';
-    serverLabel.style.marginBottom = '5px';
-    panel.appendChild(serverLabel);
 
     const serverInput = document.createElement('input');
+    serverInput.type = 'text';
     serverInput.className = 'serverInput';
     serverInput.value = 'ws://localhost:3001';
-    serverInput.style.width = '100%';
-    serverInput.style.padding = '8px';
-    serverInput.style.marginBottom = '15px';
-    serverInput.style.borderRadius = '5px';
-    serverInput.style.border = 'none';
-    panel.appendChild(serverInput);
 
-    // Room input
-    const roomLabel = document.createElement('div');
-    roomLabel.textContent = 'Room ID (for joining):';
-    roomLabel.style.textAlign = 'left';
-    roomLabel.style.marginBottom = '5px';
-    panel.appendChild(roomLabel);
+    serverContainer.appendChild(serverLabel);
+    serverContainer.appendChild(serverInput);
+    panel.appendChild(serverContainer);
 
-    const roomInput = document.createElement('input');
-    roomInput.className = 'roomInput';
-    roomInput.placeholder = 'Enter room ID to join';
-    roomInput.style.width = '100%';
-    roomInput.style.padding = '8px';
-    roomInput.style.marginBottom = '15px';
-    roomInput.style.borderRadius = '5px';
-    roomInput.style.border = 'none';
-    panel.appendChild(roomInput);
+    // Hero selection
+    const heroSelectionContainer = document.createElement('div');
+    heroSelectionContainer.className = 'hero-selection-container';
 
-    // Buttons
-    const createButton = document.createElement('button');
-    createButton.className = 'createButton';
-    createButton.textContent = 'Create Game';
-    createButton.style.display = 'block';
-    createButton.style.width = '100%';
-    createButton.style.padding = '10px';
-    createButton.style.margin = '10px 0';
-    createButton.style.backgroundColor = '#4299e1';
-    createButton.style.color = 'white';
-    createButton.style.border = 'none';
-    createButton.style.borderRadius = '5px';
-    createButton.style.cursor = 'pointer';
-    panel.appendChild(createButton);
+    const heroLabel = document.createElement('h3');
+    heroLabel.textContent = 'Choose Your Hero:';
+    heroSelectionContainer.appendChild(heroLabel);
 
+    // Hero options container
+    const heroOptionsContainer = document.createElement('div');
+    heroOptionsContainer.className = 'hero-options';
+
+    // Create hero options
+    const heroes = [
+      { id: 'warrior', name: 'Warrior', desc: 'High defense, melee attacks' },
+      { id: 'ranger', name: 'Ranger', desc: 'Long range attacks, high precision' },
+      { id: 'mage', name: 'Mage', desc: 'Powerful area damage, magical abilities' }
+    ];
+
+    heroes.forEach(hero => {
+      const heroOption = document.createElement('div');
+      heroOption.className = 'hero-option';
+      heroOption.setAttribute('data-hero', hero.id);
+
+      const radioInput = document.createElement('input');
+      radioInput.type = 'radio';
+      radioInput.name = 'heroClass';
+      radioInput.value = hero.id;
+      radioInput.id = `hero-${hero.id}`;
+      if (hero.id === 'warrior') radioInput.checked = true;
+
+      const label = document.createElement('label');
+      label.setAttribute('for', `hero-${hero.id}`);
+      label.textContent = hero.name;
+
+      const description = document.createElement('p');
+      description.textContent = hero.desc;
+
+      heroOption.appendChild(radioInput);
+      heroOption.appendChild(label);
+      heroOption.appendChild(description);
+
+      // Add click handler to select hero
+      heroOption.addEventListener('click', () => {
+        radioInput.checked = true;
+
+        // Remove selected class from all options
+        document.querySelectorAll('.hero-option').forEach(opt => {
+          opt.classList.remove('selected');
+        });
+
+        // Add selected class to this option
+        heroOption.classList.add('selected');
+      });
+
+      heroOptionsContainer.appendChild(heroOption);
+    });
+
+    heroSelectionContainer.appendChild(heroOptionsContainer);
+    panel.appendChild(heroSelectionContainer);
+
+    // Join button
     const joinButton = document.createElement('button');
     joinButton.className = 'joinButton';
     joinButton.textContent = 'Join Game';
-    joinButton.style.display = 'block';
-    joinButton.style.width = '100%';
-    joinButton.style.padding = '10px';
-    joinButton.style.margin = '10px 0';
-    joinButton.style.backgroundColor = '#4299e1';
-    joinButton.style.color = 'white';
-    joinButton.style.border = 'none';
-    joinButton.style.borderRadius = '5px';
-    joinButton.style.cursor = 'pointer';
+
+    joinButton.addEventListener('click', () => {
+      const username = usernameInput.value.trim();
+      const serverUrl = serverInput.value.trim();
+      const selectedHero = document.querySelector('input[name="heroClass"]:checked').value;
+
+      if (!username) {
+        this.showError('Please enter a username');
+        return;
+      }
+
+      this.game.networkManager.connect(serverUrl)
+        .then(() => {
+          // Set the selected hero class
+          this.game.state.heroClass = selectedHero;
+
+          // Create the hero
+          this.game.state.hero = this.game.heroFactory.createHero(selectedHero, true);
+
+          // Initialize game systems
+          if (this.game.upgradeSystem) {
+            this.game.upgradeSystem.initialize();
+          }
+
+          // Register with the server
+          this.game.networkManager.registerPlayer(username);
+
+          // Show game UI
+          this.showGameUI();
+        })
+        .catch(error => {
+          this.showError(`Failed to connect: ${error.message}`);
+        });
+    });
+
     panel.appendChild(joinButton);
 
-    const soloButton = document.createElement('button');
-    soloButton.className = 'soloButton';
-    soloButton.textContent = 'Play Solo';
-    soloButton.style.display = 'block';
-    soloButton.style.width = '100%';
-    soloButton.style.padding = '10px';
-    soloButton.style.margin = '10px 0';
-    soloButton.style.backgroundColor = '#4299e1';
-    soloButton.style.color = 'white';
-    soloButton.style.border = 'none';
-    soloButton.style.borderRadius = '5px';
-    soloButton.style.cursor = 'pointer';
-    panel.appendChild(soloButton);
-
-    // Error display
+    // Error message display
     const errorDisplay = document.createElement('div');
     errorDisplay.id = 'errorDisplay';
-    errorDisplay.style.color = '#ff6b6b';
-    errorDisplay.style.marginTop = '15px';
+    errorDisplay.className = 'error-message';
     errorDisplay.style.display = 'none';
     panel.appendChild(errorDisplay);
 
-    // Room info (shown after creation)
-    const roomInfo = document.createElement('div');
-    roomInfo.id = 'roomInfo';
-    roomInfo.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-    roomInfo.style.padding = '10px';
-    roomInfo.style.marginTop = '15px';
-    roomInfo.style.borderRadius = '5px';
-    roomInfo.style.display = 'none';
-
-    const roomIdDisplay = document.createElement('div');
-    const roomIdLabel = document.createElement('span');
-    roomIdLabel.textContent = 'Room ID: ';
-    const roomIdValue = document.createElement('span');
-    roomIdValue.id = 'roomIdValue';
-    roomIdValue.style.fontWeight = 'bold';
-
-    roomIdDisplay.appendChild(roomIdLabel);
-    roomIdDisplay.appendChild(roomIdValue);
-    roomInfo.appendChild(roomIdDisplay);
-
-    const copyButton = document.createElement('button');
-    copyButton.textContent = 'Copy ID';
-    copyButton.style.padding = '5px 10px';
-    copyButton.style.marginTop = '10px';
-    copyButton.style.backgroundColor = '#4299e1';
-    copyButton.style.color = 'white';
-    copyButton.style.border = 'none';
-    copyButton.style.borderRadius = '5px';
-    copyButton.style.cursor = 'pointer';
-    roomInfo.appendChild(copyButton);
-
-    panel.appendChild(roomInfo);
-
-    // Append to document directly for maximum visibility
-    document.body.appendChild(panel);
+    // Add to game container
+    if (this.elements.gameContainer) {
+      this.elements.gameContainer.appendChild(panel);
+    } else {
+      this.elements.gameContainer = document.getElementById('gameContainer');
+      if (!this.elements.gameContainer) {
+        this.elements.gameContainer = document.createElement('div');
+        this.elements.gameContainer.id = 'gameContainer';
+        document.body.appendChild(this.elements.gameContainer);
+      }
+      this.elements.gameContainer.appendChild(panel);
+    }
 
     return panel;
+  }
+
+  // Around line 420-430, update the Game info panel to show server health:
+  createGameInfoPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'gameInfo';
+    panel.className = 'ui-panel';
+
+    // Wave info
+    const waveContainer = document.createElement('div');
+    waveContainer.className = 'info-row';
+
+    const waveLabel = document.createElement('span');
+    waveLabel.textContent = 'Wave: ';
+
+    const waveValue = document.createElement('span');
+    waveValue.id = 'waveValue';
+    waveValue.textContent = '1';
+
+    waveContainer.appendChild(waveLabel);
+    waveContainer.appendChild(waveValue);
+    panel.appendChild(waveContainer);
+
+    // Gold info
+    const goldContainer = document.createElement('div');
+    goldContainer.className = 'info-row';
+
+    const goldLabel = document.createElement('span');
+    goldLabel.textContent = 'Gold: ';
+
+    const goldValue = document.createElement('span');
+    goldValue.id = 'goldValue';
+    goldValue.textContent = '0';
+
+    goldContainer.appendChild(goldLabel);
+    goldContainer.appendChild(goldValue);
+    panel.appendChild(goldContainer);
+
+    // Server Health instead of hero health
+    const healthContainer = document.createElement('div');
+    healthContainer.className = 'info-row';
+
+    const healthLabel = document.createElement('span');
+    healthLabel.textContent = 'Server Health: ';
+
+    const healthValue = document.createElement('span');
+    healthValue.id = 'healthValue';
+    healthValue.textContent = '500';
+
+    healthContainer.appendChild(healthLabel);
+    healthContainer.appendChild(healthValue);
+    panel.appendChild(healthContainer);
+
+    // Add to game container
+    this.elements.gameContainer.appendChild(panel);
+
+    return panel;
+  }
+
+  // Add this method to the UIManager class in src/ui/UIManager.js
+  showCountdown(seconds) {
+    // Create or get countdown element
+    let countdownElement = document.getElementById('countdownDisplay');
+
+    if (!countdownElement) {
+      countdownElement = document.createElement('div');
+      countdownElement.id = 'countdownDisplay';
+      countdownElement.style.position = 'fixed';
+      countdownElement.style.top = '50%';
+      countdownElement.style.left = '50%';
+      countdownElement.style.transform = 'translate(-50%, -50%)';
+      countdownElement.style.fontSize = '48px';
+      countdownElement.style.fontWeight = 'bold';
+      countdownElement.style.color = '#ffffff';
+      countdownElement.style.textShadow = '0 0 10px #000000';
+      countdownElement.style.zIndex = '1000';
+      document.body.appendChild(countdownElement);
+    }
+
+    // Update countdown text
+    countdownElement.textContent = seconds > 0 ? `Game starting in ${seconds}...` : 'Go!';
+    countdownElement.style.display = 'block';
+
+    // Hide the element when countdown reaches 0
+    if (seconds <= 0) {
+      setTimeout(() => {
+        countdownElement.style.display = 'none';
+      }, 1000);
+    }
+  }
+
+  showWaveCompleted(nextWave) {
+    // Create floating text to show wave completed
+    if (this.game && this.game.combatSystem) {
+      this.game.combatSystem.createFloatingText(
+        `Wave Completed! Next Wave: ${nextWave}`,
+        new THREE.Vector3(0, 2, 0),
+        0xffd700
+      );
+    }
+
+    // Update wave info UI
+    this.updateWaveUI(nextWave);
+
+    // Show wave announcement for next wave with a delay
+    setTimeout(() => {
+      this.showWaveAnnouncement(nextWave);
+    }, 2000);
   }
 
   /**
