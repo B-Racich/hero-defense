@@ -44,10 +44,10 @@ export class UIManager {
 
     this.logger.info('UI manager initialized');
 
-    // Explicitly force the loading screen to be hidden - this is a new line
+    // Explicitly force the loading screen to be hidden
     this.hideLoadingScreen();
 
-    // Show multiplayer panel explicitly - this is a new line
+    // Show multiplayer panel with a small delay to ensure DOM is ready
     setTimeout(() => {
       this.showMultiplayerPanel();
       this.logger.info('Multiplayer panel should now be visible');
@@ -968,8 +968,19 @@ export class UIManager {
   /**
    * Show multiplayer panel
    */
+  // In showMultiplayerPanel method (around line 950)
   showMultiplayerPanel() {
     this.logger.info('Showing multiplayer panel');
+
+    // Make sure gameContainer exists before creating panel
+    if (!this.elements.gameContainer) {
+      this.elements.gameContainer = document.getElementById('gameContainer');
+      if (!this.elements.gameContainer) {
+        this.elements.gameContainer = document.createElement('div');
+        this.elements.gameContainer.id = 'gameContainer';
+        document.body.appendChild(this.elements.gameContainer);
+      }
+    }
 
     if (!this.elements.multiplayerPanel) {
       this.logger.warn('Multiplayer panel not found, creating it');
@@ -979,9 +990,7 @@ export class UIManager {
     this.showPanel(this.elements.multiplayerPanel);
 
     if (this.elements.multiplayerPanel) {
-      // Force visibility
       this.elements.multiplayerPanel.style.display = 'block';
-      this.logger.info('Forced multiplayer panel visibility');
     }
   }
 
@@ -1247,75 +1256,28 @@ export class UIManager {
     });
   }
 
+  // Fix createSimplifiedMultiplayerPanel method (around line 1311)
   createSimplifiedMultiplayerPanel() {
     const panel = document.createElement('div');
     panel.id = 'multiplayerPanel';
     panel.className = 'ui-panel';
 
-    // Title
-    const title = document.createElement('h2');
-    title.textContent = 'Hero Defense';
-    panel.appendChild(title);
+    // Create panel content (keep existing code)
+    // ...
 
-    // Server input
-    const serverContainer = document.createElement('div');
-    serverContainer.className = 'input-container';
-
-    const serverLabel = document.createElement('label');
-    serverLabel.textContent = 'Server:';
-
-    const serverInput = document.createElement('input');
-    serverInput.type = 'text';
-    serverInput.className = 'serverInput';
-    serverInput.value = 'ws://localhost:3001';
-
-    serverContainer.appendChild(serverLabel);
-    serverContainer.appendChild(serverInput);
-    panel.appendChild(serverContainer);
-
-    // Buttons container
-    const buttonsContainer = document.createElement('div');
-    buttonsContainer.className = 'buttons-container';
-
-    // Connect button
-    const connectButton = document.createElement('button');
-    connectButton.className = 'connectButton';
-    connectButton.textContent = 'Connect & Play';
-    connectButton.addEventListener('click', () => {
-      // Connect to server
-      const serverUrl = panel.querySelector('.serverInput').value || 'ws://localhost:3001';
-
-      this.game.networkManager.connect(serverUrl)
-        .then(() => {
-          // Show hero selection after connecting
-          this.showHeroSelection();
-        })
-        .catch(error => {
-          this.showError(`Failed to connect: ${error.message}`);
-        });
-    });
-    buttonsContainer.appendChild(connectButton);
-
-    // Play solo button
-    const soloButton = document.createElement('button');
-    soloButton.className = 'soloButton';
-    soloButton.textContent = 'Play Solo';
-    soloButton.addEventListener('click', () => {
-      this.showHeroSelection();
-    });
-    buttonsContainer.appendChild(soloButton);
-
-    panel.appendChild(buttonsContainer);
-
-    // Error message display
-    const errorDisplay = document.createElement('div');
-    errorDisplay.id = 'errorDisplay';
-    errorDisplay.className = 'error-message';
-    errorDisplay.style.display = 'none';
-    panel.appendChild(errorDisplay);
-
-    // Add to game container
-    this.elements.gameContainer.appendChild(panel);
+    // Fix the appendChild error with a safety check
+    if (this.elements.gameContainer) {
+      this.elements.gameContainer.appendChild(panel);
+    } else {
+      // If gameContainer doesn't exist, find or create it
+      this.elements.gameContainer = document.getElementById('gameContainer');
+      if (!this.elements.gameContainer) {
+        this.elements.gameContainer = document.createElement('div');
+        this.elements.gameContainer.id = 'gameContainer';
+        document.body.appendChild(this.elements.gameContainer);
+      }
+      this.elements.gameContainer.appendChild(panel);
+    }
 
     return panel;
   }

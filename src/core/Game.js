@@ -130,6 +130,14 @@ export class Game {
       this.physicsSystem.initialize();
       this.inputManager.initialize();
 
+      setTimeout(() => {
+        if (this.uiManager) {
+          this.uiManager.hideLoadingScreen();
+          this.uiManager.showMultiplayerPanel();
+          this.logger.info('Forcing UI display after initialization');
+        }
+      }, 1000);
+
       // More code follows...
     } catch (error) {
       this.logger.error('Failed to initialize game:', error);
