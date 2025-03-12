@@ -1,31 +1,31 @@
 {
-    "name": "hero-defense",
-    "version": "1.0.0",
-    "description": "A 3D tower defense game with multiple hero classes and multiplayer support",
-    "main": "src/index.js",
-    "scripts": {
-      "start": "webpack serve --mode development",
-      "build": "webpack --mode production",
-      "lint": "eslint src/**/*.js",
-      "test": "jest"
-    },
-    "author": "",
-    "license": "MIT",
-    "dependencies": {
-      "three": "^0.150.0"
-    },
-    "devDependencies": {
-      "@babel/core": "^7.21.0",
-      "@babel/preset-env": "^7.20.2",
-      "babel-loader": "^9.1.2",
-      "copy-webpack-plugin": "^11.0.0",
-      "css-loader": "^6.7.3",
-      "eslint": "^8.35.0",
-      "html-webpack-plugin": "^5.5.0",
-      "jest": "^29.5.0",
-      "style-loader": "^3.3.1",
-      "webpack": "^5.75.0",
-      "webpack-cli": "^5.0.1",
-      "webpack-dev-server": "^4.11.1"
-    }
+  "name": "hero-defense",
+  "version": "1.0.0",
+  "description": "A 3D tower defense game with multiple hero classes and multiplayer support",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "webpack serve --mode development --open",
+    "build": "webpack --mode production",
+    "lint": "eslint src/**/*.js",
+    "test": "jest"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "three": "^0.150.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.21.0",
+    "@babel/preset-env": "^7.20.2",
+    "babel-loader": "^9.1.2",
+    "copy-webpack-plugin": "^11.0.0",
+    "css-loader": "^6.7.3",
+    "eslint": "^8.35.0",
+    "html-webpack-plugin": "^5.5.0",
+    "jest": "^29.5.0",
+    "style-loader": "^3.3.1",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1",
+    "webpack-dev-server": "^4.11.1"
   }
+}

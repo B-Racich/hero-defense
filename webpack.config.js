@@ -10,15 +10,18 @@ module.exports = (env, argv) => {
     entry: './src/index.js',
     output: {
       filename: 'bundle.[contenthash].js',
-      path: path.resolve(__dirname, 'build'),
+      path: path.resolve(__dirname, 'dist'),
       clean: true
     },
     devtool: isProduction ? 'source-map' : 'eval-source-map',
     devServer: {
-      static: path.join(__dirname, 'public'),
-      port: 3000,
+      static: {
+        directory: path.join(__dirname, 'public'),
+      },
       hot: true,
-      open: true
+      port: 3000,
+      open: true,
+      historyApiFallback: true
     },
     module: {
       rules: [
@@ -41,16 +44,16 @@ module.exports = (env, argv) => {
     plugins: [
       new HtmlWebpackPlugin({
         template: './public/index.html',
-        // favicon: './public/favicon.ico',
+        inject: true,
         minify: isProduction
       }),
       new CopyWebpackPlugin({
         patterns: [
           { 
             from: 'public', 
-            to: './', 
+            to: '.',
             globOptions: {
-              ignore: ['**/index.html', '**/favicon.ico']
+              ignore: ['**/index.html']
             }
           }
         ]
