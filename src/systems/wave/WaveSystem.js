@@ -29,7 +29,7 @@ export class WaveSystem {
    */
   initialize() {
     // Import EnemyFactory
-    const { EnemyFactory } = require('../components/enemy/EnemyFactory.js');
+    const { EnemyFactory } = require('../../components/enemy/EnemyFactory.js');
     this.enemyFactory = new EnemyFactory(this.game);
     
     this.logger.info('Wave system initialized');
