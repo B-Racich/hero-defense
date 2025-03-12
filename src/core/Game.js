@@ -101,16 +101,11 @@ export class Game {
   /**
    * Initialize game systems and start the game loop
    */
+  // src/core/Game.js - Around line 90
   async initialize() {
     this.logger.info('Initializing game');
 
     try {
-
-      // Initialize quality controller first
-      this.qualityController.initialize('low');
-
-      // this.enablePerformanceMode();
-
       this.geometryPool = new GeometryPool();
       this.materialPool = new MaterialPool();
 
@@ -120,43 +115,22 @@ export class Game {
         this.uiManager.updateLoadingProgress(progress);
       });
 
-      // Initialize all systems
+      // Initialize scene manager first
       this.sceneManager.initialize();
 
       this.camera = this.sceneManager.camera;
 
+      // Initialize render system
       this.renderSystem.initialize();
-      this.physicsSystem.initialize();
 
+      // Now initialize quality controller after renderer exists
+      this.qualityController.initialize('low');
+
+      // Rest of initialization
+      this.physicsSystem.initialize();
       this.inputManager.initialize();
 
-      // Set up mouse click handler for hero movement
-      this.inputManager.events.on('mousedown', (data) => {
-        if (data.button === 0 && this.state.hero) { // Left button
-          // Create a raycaster
-          const raycaster = new THREE.Raycaster();
-          raycaster.setFromCamera(data.normalized, this.camera);
-
-          // Create a ground plane for intersection
-          const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-          const targetPoint = new THREE.Vector3();
-
-          if (raycaster.ray.intersectPlane(groundPlane, targetPoint)) {
-            this.logger.info(`Moving hero to position: ${targetPoint.x.toFixed(2)}, ${targetPoint.y.toFixed(2)}, ${targetPoint.z.toFixed(2)}`);
-            this.state.hero.moveTo(targetPoint);
-          }
-        }
-      });
-
-      this.uiManager.initialize();
-
-      // Show multiplayer options first
-      this.uiManager.showMultiplayerPanel();
-
-      // Start game loop
-      this.engine.start(this.update);
-
-      this.logger.info('Game initialized successfully');
+      // More code follows...
     } catch (error) {
       this.logger.error('Failed to initialize game:', error);
     }

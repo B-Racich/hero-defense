@@ -218,10 +218,11 @@ export class NetworkManager {
           this.logger.error(`Server error: ${message.message}`);
           this.events.emit('error', { message: message.message });
           break;
+        // src/network/NetworkManager.js - Around line 220
         case 'enemy_spawn':
           // Create enemy locally based on server data
-          if (this.game.enemyFactory) {
-            const enemy = this.game.enemyFactory.createEnemy(message.enemyType, {
+          if (this.game.waveSystem && this.game.waveSystem.enemyFactory) {
+            const enemy = this.game.waveSystem.enemyFactory.createEnemy(message.enemyType, {
               id: message.enemyId,
               position: message.position
             });
@@ -336,17 +337,13 @@ export class NetworkManager {
     this.events.emit('gameStateUpdated', state);
   }
 
-  /**
-   * Request enemy spawn from server
-   * @param {string} type - Enemy type
-   * @param {Object} position - Spawn position
-   */
+  // src/network/NetworkManager.js - Around line 330
   requestEnemySpawn(type, position) {
     if (!this.connected) return;
 
     this.send({
       type: 'spawn_enemy',
-      type: type,
+      enemyType: type,  // Changed from 'type' to 'enemyType'
       position: position
     });
   }

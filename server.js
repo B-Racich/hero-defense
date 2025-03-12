@@ -105,8 +105,9 @@ wss.on('connection', (ws) => {
           }
           break;
 
+        // server.js - Around line 100
         case 'spawn_enemy':
-          const enemyId = spawnEnemy(data.type, data.position);
+          const enemyId = spawnEnemy(data.enemyType, data.position);  // Changed from data.type to data.enemyType
           // Response is handled by broadcast
           break;
 
@@ -155,6 +156,22 @@ function spawnEnemy(type, position) {
   }, []);
 
   return enemyId;
+}
+
+// server.js - Add near other utility functions
+// Helper function to get enemy health
+function getEnemyHealth(type) {
+  // Default values for enemy types
+  const healthMap = {
+    grunt: 30,
+    scout: 20,
+    brute: 60,
+    mage: 15,
+    assassin: 25,
+    commander: 100
+  };
+  
+  return healthMap[type] || 30; // Default to 30 health
 }
 
 // Update enemy position

@@ -409,7 +409,7 @@ export class Enemy {
       remainingHealth: this.health
     });
 
-    // Check if defeated
+    /// Check if defeated
     if (this.health <= 0 && !this.deathAnimationStarted) {
       this.deathAnimationStarted = true;
 
@@ -418,6 +418,11 @@ export class Enemy {
         enemyId: this.id,
         source: source
       });
+
+      // Check wave completion
+      if (this.game && this.game.waveSystem) {
+        this.game.waveSystem.checkWaveCompletion();
+      }
     }
 
     return finalDamage;
