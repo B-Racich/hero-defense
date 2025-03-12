@@ -358,11 +358,30 @@ export class RenderSystem {
    */
   render() {
     if (!this.renderer || !this.scene || !this.camera) {
+      this.logger.error('Cannot render: Missing required components');
       return;
     }
     
+    // Diagnostic logging
+    if (this.frameCount % 100 === 0) {
+      this.logger.debug(`Scene contains ${this.scene.children.length} objects`);
+      
+      // Check if renderer canvas is in DOM
+      if (!document.body.contains(this.renderer.domElement)) {
+        this.logger.error('Renderer canvas not in DOM!');
+        document.body.insertBefore(this.renderer.domElement, document.body.firstChild);
+      }
+    }
+    
+    // Ensure background color is set
+    this.scene.background = new THREE.Color(0x87ceeb);
+    
     // Render scene
-    this.renderer.render(this.scene, this.camera);
+    try {
+      this.renderer.render(this.scene, this.camera);
+    } catch (error) {
+      this.logger.error('Error during rendering:', error);
+    }
     
     // Update FPS counter
     this.updateFps();

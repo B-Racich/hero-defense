@@ -10,7 +10,7 @@ export class SceneManager {
     this.scene = null;
     this.camera = null;
     this.renderer = null;
-    
+
     // Collections for tracking objects
     this.objects = {
       heroes: [],
@@ -18,14 +18,15 @@ export class SceneManager {
       environment: [],
       effects: []
     };
-    
+
     // Bind methods to maintain context
     this.handleResize = this.handleResize.bind(this);
   }
-  
+
   /**
    * Initialize scene, camera, and renderer
    */
+  // src/core/SceneManager.js - modify the initialize method around line 30
   initialize() {
     this.logger.info('Initializing scene manager');
     
@@ -44,14 +45,35 @@ export class SceneManager {
     this.camera.position.set(0, 15, 15);
     this.camera.lookAt(0, 0, 0);
     
-    // Create renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Create renderer - CRITICAL FIX
+    this.renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      alpha: false // Don't use alpha, it can cause black screen issues
+    });
+    this.renderer.setClearColor(0x87ceeb, 1); // Explicitly set clear color
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     
-    // Add renderer to DOM
-    document.body.appendChild(this.renderer.domElement);
+    // Position renderer canvas
+    this.renderer.domElement.style.position = 'fixed';
+    this.renderer.domElement.style.top = '0';
+    this.renderer.domElement.style.left = '0';
+    this.renderer.domElement.style.width = '100%';
+    this.renderer.domElement.style.height = '100%';
+    this.renderer.domElement.style.zIndex = '0'; // Under UI elements
+    
+    // Add renderer to DOM at the beginning of the body
+    document.body.insertBefore(this.renderer.domElement, document.body.firstChild);
+    
+    // Add a test object to confirm rendering works
+    const testGeometry = new THREE.BoxGeometry(2, 2, 2);
+    const testMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    const testCube = new THREE.Mesh(testGeometry, testMaterial);
+    testCube.position.set(0, 5, 0);
+    this.scene.add(testCube);
+    this.logger.info('Added test cube to scene');
     
     // Set up lighting
     this.setupLighting();
@@ -59,9 +81,12 @@ export class SceneManager {
     // Set up window resize event listener
     window.addEventListener('resize', this.handleResize);
     
+    // Force immediate render to test
+    this.renderer.render(this.scene, this.camera);
+    this.logger.info('Performed test render');
+    
     this.logger.info('Scene manager initialized');
   }
-  
   /**
    * Set up scene lighting
    */
@@ -69,12 +94,12 @@ export class SceneManager {
     // Ambient light
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     this.scene.add(ambientLight);
-    
+
     // Directional light (sun)
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 10, 5);
     directionalLight.castShadow = true;
-    
+
     // Configure shadow properties
     directionalLight.shadow.camera.near = 0.5;
     directionalLight.shadow.camera.far = 50;
@@ -84,10 +109,10 @@ export class SceneManager {
     directionalLight.shadow.camera.bottom = -10;
     directionalLight.shadow.mapSize.width = 1024;
     directionalLight.shadow.mapSize.height = 1024;
-    
+
     this.scene.add(directionalLight);
   }
-  
+
   /**
    * Handle window resize
    */
@@ -96,7 +121,7 @@ export class SceneManager {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
-  
+
   /**
    * Add object to scene and track it by category
    * @param {THREE.Object3D} object - The object to add
@@ -108,9 +133,9 @@ export class SceneManager {
       this.logger.warn('Attempted to add null object to scene');
       return null;
     }
-    
+
     this.scene.add(object);
-    
+
     // Track object in appropriate category
     if (this.objects[category]) {
       this.objects[category].push(object);
@@ -118,10 +143,10 @@ export class SceneManager {
       this.logger.warn(`Unknown category: ${category}, defaulting to 'environment'`);
       this.objects.environment.push(object);
     }
-    
+
     return object;
   }
-  
+
   /**
    * Remove object from scene and tracking
    * @param {THREE.Object3D} object - The object to remove
@@ -132,9 +157,9 @@ export class SceneManager {
       this.logger.warn('Attempted to remove null object from scene');
       return false;
     }
-    
+
     this.scene.remove(object);
-    
+
     // Remove from tracking
     let found = false;
     Object.keys(this.objects).forEach(category => {
@@ -144,10 +169,10 @@ export class SceneManager {
         found = true;
       }
     });
-    
+
     return found;
   }
-  
+
   /**
    * Create a raycaster for mouse picking
    * @param {THREE.Vector2} mouseCoords - Normalized mouse coordinates (-1 to 1)
@@ -158,7 +183,7 @@ export class SceneManager {
     raycaster.setFromCamera(mouseCoords, this.camera);
     return raycaster;
   }
-  
+
   /**
    * Clear all objects in a specific category
    * @param {string} category - Category to clear (heroes, enemies, environment, effects)
@@ -168,40 +193,40 @@ export class SceneManager {
       this.logger.warn(`Unknown category: ${category}`);
       return;
     }
-    
+
     // Remove all objects in category from scene
     this.objects[category].forEach(object => {
       this.scene.remove(object);
     });
-    
+
     // Clear array
     this.objects[category] = [];
   }
-  
+
   /**
    * Clean up resources used by the scene manager
    */
   dispose() {
     this.logger.info('Disposing scene manager resources');
-    
+
     // Remove resize listener
     window.removeEventListener('resize', this.handleResize);
-    
+
     // Remove renderer from DOM
     if (this.renderer && this.renderer.domElement) {
       document.body.removeChild(this.renderer.domElement);
     }
-    
+
     // Dispose of renderer
     if (this.renderer) {
       this.renderer.dispose();
     }
-    
+
     // Clear all objects
     Object.keys(this.objects).forEach(category => {
       this.clearCategory(category);
     });
-    
+
     this.logger.info('Scene manager resources disposed');
   }
 }

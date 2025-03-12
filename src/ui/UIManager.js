@@ -906,21 +906,40 @@ export class UIManager {
    * Show game UI (after hero selection)
    */
   showGameUI() {
+    // Force hide loading screen
+    this.hideLoadingScreen();
+    
     // Hide hero selection
     this.hidePanel(this.elements.heroSelection);
     
     // Hide multiplayer panel
     this.hidePanel(this.elements.multiplayerPanel);
     
-    // Show game panels
-    this.showPanel(this.elements.gameInfo, false);
-    this.showPanel(this.elements.upgradePanel, false);
-    this.showPanel(this.elements.abilityBar, false);
+    // Force game container to be visible
+    if (this.elements.gameContainer) {
+      this.elements.gameContainer.style.display = 'block';
+    }
     
-    // Multiplayer UI if connected
-    if (this.game.networkManager && this.game.networkManager.connected) {
-      this.showPanel(this.elements.playerList, false);
-      this.showPanel(this.elements.chatContainer, false);
+    // Show game panels with explicit z-index
+    this.showPanel(this.elements.gameInfo, false);
+    if (this.elements.gameInfo) {
+      this.elements.gameInfo.style.zIndex = '10';
+    }
+    
+    this.showPanel(this.elements.upgradePanel, false);
+    if (this.elements.upgradePanel) {
+      this.elements.upgradePanel.style.zIndex = '10';
+    }
+    
+    this.showPanel(this.elements.abilityBar, false);
+    if (this.elements.abilityBar) {
+      this.elements.abilityBar.style.zIndex = '10';
+    }
+    
+    // Always show chat in both multiplayer and single player
+    this.showPanel(this.elements.chatContainer, false);
+    if (this.elements.chatContainer) {
+      this.elements.chatContainer.style.zIndex = '10';
     }
     
     // Update UI with initial values
