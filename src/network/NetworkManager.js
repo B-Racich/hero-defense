@@ -3,6 +3,7 @@ import { EventEmitter } from '../utils/EventEmitter.js';
 
 /**
  * Manages network communications for multiplayer functionality
+ * Simplified to use a single global game room
  */
 export class NetworkManager {
   /**
@@ -16,13 +17,11 @@ export class NetworkManager {
     // Connection state
     this.socket = null;
     this.connected = false;
-    this.roomId = null;
     this.playerId = null;
-    this.isHost = false;
-    this.lastSyncTime = 0;
     this.otherPlayers = {};
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
+    this.lastSyncTime = 0;
     
     // Bind methods to maintain context
     this.connect = this.connect.bind(this);
@@ -72,6 +71,10 @@ export class NetworkManager {
           this.connected = true;
           this.reconnectAttempts = 0;
           this.logger.info('Connected to server');
+          
+          // Register player immediately
+          this.registerPlayer();
+          
           resolve();
         };
         
@@ -95,6 +98,24 @@ export class NetworkManager {
   }
   
   /**
+   * Register player with the server
+   */
+  registerPlayer() {
+    if (!this.connected) {
+      this.logger.error('Not connected, cannot register player');
+      return;
+    }
+    
+    this.logger.info('Registering player with server');
+    
+    this.send({
+      type: 'register_player',
+      playerId: this.playerId,
+      heroClass: this.game.state.heroClass
+    });
+  }
+  
+  /**
    * Disconnect from the server
    */
   disconnect() {
@@ -109,8 +130,6 @@ export class NetworkManager {
     this.socket.close();
     this.socket = null;
     this.connected = false;
-    this.roomId = null;
-    this.isHost = false;
     this.otherPlayers = {};
     
     // Make game instance aware of otherPlayers
@@ -130,11 +149,12 @@ export class NetworkManager {
       this.logger.debug('Received message:', message.type);
       
       switch (message.type) {
-        case 'room_created':
-          this.roomId = message.roomId;
-          this.isHost = true;
-          this.logger.info(`Room created: ${this.roomId}, you are the host`);
-          this.events.emit('roomCreated', { roomId: this.roomId });
+        case 'player_registered':
+          this.logger.info(`Player registered: ${message.playerId}`);
+          this.events.emit('playerRegistered', { 
+            playerId: message.playerId,
+            playerCount: message.playerCount
+          });
           break;
           
         case 'player_joined':
@@ -177,12 +197,6 @@ export class NetworkManager {
             playerId: message.playerId,
             playerCount: message.playerCount
           });
-          break;
-          
-        case 'host_assigned':
-          this.isHost = true;
-          this.logger.info('You are now the host');
-          this.events.emit('hostAssigned');
           break;
           
         case 'game_state':
@@ -231,7 +245,7 @@ export class NetworkManager {
     this.logger.info(`Connection closed, code: ${event.code}, reason: ${event.reason}`);
     
     // Try to reconnect if not a clean closure
-    if (event.code !== 1000 && this.roomId) {
+    if (event.code !== 1000) {
       this.attemptReconnect();
     } else {
       this.events.emit('disconnected');
@@ -260,52 +274,13 @@ export class NetworkManager {
       
       // Try to reconnect
       this.connect(this.socket.url).then(() => {
-        // Re-join the room
-        if (this.roomId) {
-          this.joinRoom(this.roomId);
-        }
+        // Re-register player upon reconnect
+        this.registerPlayer();
       }).catch(error => {
         this.logger.error('Reconnect failed:', error);
         this.attemptReconnect();
       });
     }, delay);
-  }
-  
-  /**
-   * Create a new game room
-   */
-  createRoom() {
-    if (!this.connected) {
-      this.logger.error('Not connected, cannot create room');
-      return;
-    }
-    
-    this.logger.info('Creating new game room');
-    
-    this.send({
-      type: 'create_room',
-      playerId: this.playerId
-    });
-  }
-  
-  /**
-   * Join an existing game room
-   * @param {string} roomId - Room ID to join
-   */
-  joinRoom(roomId) {
-    if (!this.connected) {
-      this.logger.error('Not connected, cannot join room');
-      return;
-    }
-    
-    this.logger.info(`Joining room: ${roomId}`);
-    this.roomId = roomId;
-    
-    this.send({
-      type: 'join_room',
-      roomId: roomId,
-      playerId: this.playerId
-    });
   }
   
   /**
@@ -389,7 +364,7 @@ export class NetworkManager {
    * Send local player state to server
    */
   sendPlayerUpdate() {
-    if (!this.connected || !this.roomId || !this.game.state.hero) {
+    if (!this.connected || !this.game.state.hero) {
       return;
     }
     
@@ -418,10 +393,10 @@ export class NetworkManager {
   }
   
   /**
-   * Send game state update to other players (host only)
+   * Send game state update to other players
    */
   sendGameState() {
-    if (!this.connected || !this.roomId || !this.isHost) {
+    if (!this.connected) {
       return;
     }
     
@@ -430,7 +405,6 @@ export class NetworkManager {
       wave: this.game.state.wave,
       waveInProgress: this.game.state.waveInProgress,
       enemiesDefeated: this.game.state.enemiesDefeated
-      // Include other relevant state data
     };
     
     this.send({
@@ -444,7 +418,7 @@ export class NetworkManager {
    * @param {string} message - Chat message to send
    */
   sendChatMessage(message) {
-    if (!this.connected || !this.roomId) {
+    if (!this.connected) {
       this.logger.error('Not connected, cannot send chat');
       return;
     }
@@ -459,7 +433,7 @@ export class NetworkManager {
    * Send game over notification
    */
   sendGameOverMessage() {
-    if (!this.connected || !this.roomId || !this.isHost) {
+    if (!this.connected) {
       return;
     }
     
@@ -495,7 +469,7 @@ export class NetworkManager {
    * @param {number} delta - Time since last update in seconds
    */
   update(delta) {
-    if (!this.connected || !this.roomId) {
+    if (!this.connected) {
       return;
     }
     
@@ -507,10 +481,8 @@ export class NetworkManager {
       // Send player update
       this.sendPlayerUpdate();
       
-      // If host, send game state too
-      if (this.isHost) {
-        this.sendGameState();
-      }
+      // Send game state too
+      this.sendGameState();
       
       this.lastSyncTime = now;
     }

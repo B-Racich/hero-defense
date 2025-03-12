@@ -478,25 +478,33 @@ export class Hero {
   takeDamage(amount, source) {
     // Apply damage reduction from buffs
     let damageReduction = 0;
-
+  
     this.buffs.forEach(buff => {
       if (buff.damageReduction) {
         damageReduction += buff.damageReduction;
       }
     });
-
+  
     // Cap damage reduction at 90%
     damageReduction = Math.min(0.9, damageReduction);
-
+  
     // Calculate final damage
     const actualDamage = Math.round(amount * (1 - damageReduction));
-
+    
+    // Update hero's health - ADD THIS LINE
+    this.upgradeStats.health.value = Math.max(0, this.upgradeStats.health.value - actualDamage);
+  
     // Emit health changed event
     this.events.emit('healthChanged', {
       amount: -actualDamage,
       source: source
     });
-
+    
+    // Check if hero is defeated - ADD THESE LINES
+    if (this.upgradeStats.health.value <= 0 && this.game) {
+      this.game.gameOver();
+    }
+  
     return actualDamage;
   }
 

@@ -102,7 +102,7 @@ export class UIManager {
     // Multiplayer join/create panel
     this.elements.multiplayerPanel = document.getElementById('multiplayerPanel');
     if (!this.elements.multiplayerPanel) {
-      this.elements.multiplayerPanel = this.createMultiplayerPanel();
+      this.elements.multiplayerPanel = this.createSimplifiedMultiplayerPanel();
     }
 
     // Wave info
@@ -966,7 +966,7 @@ export class UIManager {
 
     if (!this.elements.multiplayerPanel) {
       this.logger.warn('Multiplayer panel not found, creating it');
-      this.elements.multiplayerPanel = this.createMultiplayerPanel();
+      this.elements.multiplayerPanel = this.createSimplifiedMultiplayerPanel();
     }
 
     this.showPanel(this.elements.multiplayerPanel);
@@ -1238,6 +1238,79 @@ export class UIManager {
         button.disabled = this.game.state.gold < cost;
       }
     });
+  }
+
+  createSimplifiedMultiplayerPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'multiplayerPanel';
+    panel.className = 'ui-panel';
+
+    // Title
+    const title = document.createElement('h2');
+    title.textContent = 'Hero Defense';
+    panel.appendChild(title);
+
+    // Server input
+    const serverContainer = document.createElement('div');
+    serverContainer.className = 'input-container';
+
+    const serverLabel = document.createElement('label');
+    serverLabel.textContent = 'Server:';
+
+    const serverInput = document.createElement('input');
+    serverInput.type = 'text';
+    serverInput.className = 'serverInput';
+    serverInput.value = 'ws://localhost:3001';
+
+    serverContainer.appendChild(serverLabel);
+    serverContainer.appendChild(serverInput);
+    panel.appendChild(serverContainer);
+
+    // Buttons container
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.className = 'buttons-container';
+
+    // Connect button
+    const connectButton = document.createElement('button');
+    connectButton.className = 'connectButton';
+    connectButton.textContent = 'Connect & Play';
+    connectButton.addEventListener('click', () => {
+      // Connect to server
+      const serverUrl = panel.querySelector('.serverInput').value || 'ws://localhost:3001';
+
+      this.game.networkManager.connect(serverUrl)
+        .then(() => {
+          // Show hero selection after connecting
+          this.showHeroSelection();
+        })
+        .catch(error => {
+          this.showError(`Failed to connect: ${error.message}`);
+        });
+    });
+    buttonsContainer.appendChild(connectButton);
+
+    // Play solo button
+    const soloButton = document.createElement('button');
+    soloButton.className = 'soloButton';
+    soloButton.textContent = 'Play Solo';
+    soloButton.addEventListener('click', () => {
+      this.showHeroSelection();
+    });
+    buttonsContainer.appendChild(soloButton);
+
+    panel.appendChild(buttonsContainer);
+
+    // Error message display
+    const errorDisplay = document.createElement('div');
+    errorDisplay.id = 'errorDisplay';
+    errorDisplay.className = 'error-message';
+    errorDisplay.style.display = 'none';
+    panel.appendChild(errorDisplay);
+
+    // Add to game container
+    this.elements.gameContainer.appendChild(panel);
+
+    return panel;
   }
 
   /**

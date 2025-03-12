@@ -7,93 +7,81 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Room management
-const rooms = {};
+// Single global game state
+const gameState = {
+  wave: 1,
+  enemies: [],
+  gameActive: true,
+  players: {}
+};
 
 // Connection handling
 wss.on('connection', (ws) => {
   let playerId;
-  let roomId;
 
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
       
       switch (data.type) {
-        case 'create_room':
-          roomId = generateRoomId();
-          playerId = data.playerId;
+        case 'register_player':
+          playerId = data.playerId || 'player_' + Math.random().toString(36).substring(2, 9);
           
-          rooms[roomId] = { 
-            host: playerId,
-            players: { [playerId]: { ws, lastSeen: Date.now() } },
-            state: {
-              wave: 1,
-              enemies: [],
-              gameActive: false
-            }
+          // Add player to game
+          gameState.players[playerId] = { 
+            ws, 
+            lastSeen: Date.now(),
+            heroClass: data.heroClass || null
           };
           
           ws.send(JSON.stringify({ 
-            type: 'room_created', 
-            roomId: roomId 
+            type: 'player_registered', 
+            playerId: playerId,
+            playerCount: Object.keys(gameState.players).length
           }));
-          break;
           
-        case 'join_room':
-          roomId = data.roomId;
-          playerId = data.playerId;
-          
-          if (!rooms[roomId]) {
-            ws.send(JSON.stringify({ 
-              type: 'error', 
-              message: 'Room not found' 
-            }));
-            return;
-          }
-          
-          // Add player to room
-          rooms[roomId].players[playerId] = { ws, lastSeen: Date.now() };
-          
-          // Notify all players in room
-          broadcastToRoom(roomId, {
+          // Notify all players
+          broadcastToAll({
             type: 'player_joined',
             playerId: playerId,
-            playerCount: Object.keys(rooms[roomId].players).length
+            playerCount: Object.keys(gameState.players).length
           }, []);
           
           // Send current game state to new player
           ws.send(JSON.stringify({
             type: 'game_state',
-            state: rooms[roomId].state
+            state: gameState
           }));
-          
           break;
           
         case 'game_state':
-          // Only the host can update game state
-          if (rooms[roomId] && rooms[roomId].host === playerId) {
-            rooms[roomId].state = {
-              ...rooms[roomId].state,
-              ...data.state
-            };
-            
-            // Broadcast to other players
-            broadcastToRoom(roomId, {
-              type: 'game_state',
-              state: rooms[roomId].state
-            }, [playerId]);
-          }
+          // Update game state
+          gameState.wave = data.state.wave || gameState.wave;
+          gameState.enemies = data.state.enemies || gameState.enemies;
+          gameState.gameActive = data.state.gameActive !== undefined ? data.state.gameActive : gameState.gameActive;
+          
+          // Broadcast to other players
+          broadcastToAll({
+            type: 'game_state',
+            state: gameState
+          }, [playerId]);
           break;
           
         case 'player_update':
-          if (!rooms[roomId]) return;
+          if (!playerId) return;
           
           // Update player's last seen timestamp
-          rooms[roomId].players[playerId].lastSeen = Date.now();
+          if (gameState.players[playerId]) {
+            gameState.players[playerId].lastSeen = Date.now();
+            
+            // Update hero class if provided
+            if (data.data && data.data.heroClass) {
+              gameState.players[playerId].heroClass = data.data.heroClass;
+            }
+          }
           
           // Broadcast player update to other players
-          broadcastToRoom(roomId, {
+          broadcastToAll({
             type: 'player_update',
             playerId: playerId,
             data: data.data
@@ -101,10 +89,10 @@ wss.on('connection', (ws) => {
           break;
           
         case 'chat':
-          if (!rooms[roomId]) return;
+          if (!playerId) return;
           
           // Broadcast chat message to all players
-          broadcastToRoom(roomId, {
+          broadcastToAll({
             type: 'chat',
             playerId: playerId,
             message: data.message
@@ -117,99 +105,48 @@ wss.on('connection', (ws) => {
   });
   
   ws.on('close', () => {
-    if (roomId && rooms[roomId]) {
-      // Remove player from room
-      delete rooms[roomId].players[playerId];
+    if (playerId && gameState.players[playerId]) {
+      // Remove player from game
+      delete gameState.players[playerId];
       
       // Notify remaining players
-      broadcastToRoom(roomId, {
+      broadcastToAll({
         type: 'player_left',
         playerId: playerId,
-        playerCount: Object.keys(rooms[roomId].players).length
+        playerCount: Object.keys(gameState.players).length
       }, []);
-      
-      // If host left, assign new host or clean up empty room
-      if (playerId === rooms[roomId].host) {
-        const remainingPlayers = Object.keys(rooms[roomId].players);
-        
-        if (remainingPlayers.length > 0) {
-          const newHost = remainingPlayers[0];
-          rooms[roomId].host = newHost;
-          
-          // Notify new host
-          const newHostWs = rooms[roomId].players[newHost].ws;
-          newHostWs.send(JSON.stringify({
-            type: 'host_assigned'
-          }));
-        } else {
-          // Clean up empty room
-          delete rooms[roomId];
-        }
-      }
     }
   });
 });
 
-// Utility function to broadcast to all players in a room
-function broadcastToRoom(roomId, message, excludePlayers = []) {
-  if (!rooms[roomId]) return;
-  
+// Utility function to broadcast to all players
+function broadcastToAll(message, excludePlayers = []) {
   const messageStr = JSON.stringify(message);
   
-  Object.entries(rooms[roomId].players).forEach(([id, player]) => {
+  Object.entries(gameState.players).forEach(([id, player]) => {
     if (!excludePlayers.includes(id) && player.ws.readyState === WebSocket.OPEN) {
       player.ws.send(messageStr);
     }
   });
 }
 
-function generateRoomId() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
 // Clean up inactive players periodically
 setInterval(() => {
   const now = Date.now();
   
-  Object.keys(rooms).forEach(roomId => {
-    Object.keys(rooms[roomId].players).forEach(playerId => {
-      const player = rooms[roomId].players[playerId];
-      
-      // Remove players inactive for more than 30 seconds
-      if (now - player.lastSeen > 30000) {
-        delete rooms[roomId].players[playerId];
-        
-        // Notify remaining players
-        broadcastToRoom(roomId, {
-          type: 'player_disconnected',
-          playerId: playerId,
-          playerCount: Object.keys(rooms[roomId].players).length
-        }, []);
-        
-        // Handle host disconnection
-        if (playerId === rooms[roomId].host) {
-          const remainingPlayers = Object.keys(rooms[roomId].players);
-          
-          if (remainingPlayers.length > 0) {
-            const newHost = remainingPlayers[0];
-            rooms[roomId].host = newHost;
-            
-            // Notify new host
-            const newHostWs = rooms[roomId].players[newHost].ws;
-            newHostWs.send(JSON.stringify({
-              type: 'host_assigned'
-            }));
-          } else {
-            // Clean up empty room
-            delete rooms[roomId];
-          }
-        }
-      }
-    });
+  Object.keys(gameState.players).forEach(playerId => {
+    const player = gameState.players[playerId];
     
-    // Clean up empty rooms
-    if (Object.keys(rooms[roomId].players).length === 0) {
-      delete rooms[roomId];
+    // Remove players inactive for more than 30 seconds
+    if (now - player.lastSeen > 30000) {
+      delete gameState.players[playerId];
+      
+      // Notify remaining players
+      broadcastToAll({
+        type: 'player_disconnected',
+        playerId: playerId,
+        playerCount: Object.keys(gameState.players).length
+      }, []);
     }
   });
 }, 10000);

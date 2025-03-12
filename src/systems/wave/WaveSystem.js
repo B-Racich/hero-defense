@@ -154,32 +154,33 @@ export class WaveSystem {
    */
   checkWaveCompletion() {
     this.logger.debug(`Checking wave completion: waveInProgress=${this.waveInProgress}, waveEnemiesLeft=${this.waveEnemiesLeft}, enemies=${this.game.state.enemies.length}`);
-
+  
+    // Fix: Check only if no more enemies to spawn and no enemies on screen
     if (this.waveInProgress && this.waveEnemiesLeft <= 0 && this.game.state.enemies.length === 0) {
       this.logger.info(`Wave ${this.currentWave} completed`);
       this.waveInProgress = false;
-
+  
       // Award wave completion bonus
       const waveBonus = 10 * this.currentWave;
       this.game.state.gold += waveBonus;
       this.game.uiManager.updateGoldUI(this.game.state.gold);
-
+  
       // Show bonus message
       this.game.combatSystem.createFloatingText(
         `Wave Completed! +${waveBonus} gold`,
         new THREE.Vector3(0, 2, 0),
         0xffd700
       );
-
+  
       // Update UI
       this.game.uiManager.updateWaveCompletedUI(this.currentWave);
-
+  
       // Emit wave completed event
       this.game.events.emit('waveCompleted', {
         wave: this.currentWave,
         bonus: waveBonus
       });
-
+  
       // Start next wave after delay
       setTimeout(() => {
         if (this.game.state.gameActive) {
