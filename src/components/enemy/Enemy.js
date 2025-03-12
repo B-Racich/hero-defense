@@ -47,36 +47,35 @@ export class Enemy {
    * Create the 3D mesh for the enemy
    * @returns {THREE.Group} The enemy mesh group
    */
+  // Near line 80 in Enemy.js
   createMesh() {
-    this.logger.debug(`Creating mesh for enemy: ${this.name}`);
+    // Get geometry and material pools from the game
+    const geometryPool = this.game.geometryPool;
+    const materialPool = this.game.materialPool;
 
     // Create group to hold enemy components
     const enemyGroup = new THREE.Group();
     enemyGroup.position.copy(this.position);
 
-    // Create the appropriate geometry based on the enemy type
+    // Get the appropriate geometry from the pool
     let enemyGeometry;
     switch (this.shape) {
       case 'sphere':
-        enemyGeometry = new THREE.SphereGeometry(0.4, 16, 16);
+        enemyGeometry = geometryPool.getSphereGeometry(0.4);
         break;
       case 'tetrahedron':
-        enemyGeometry = new THREE.TetrahedronGeometry(0.5);
+        enemyGeometry = geometryPool.getTetrahedronGeometry(0.5);
         break;
       case 'cone':
-        enemyGeometry = new THREE.ConeGeometry(0.4, 0.8, 8);
+        enemyGeometry = geometryPool.getConeGeometry(0.4, 0.8, 8);
         break;
       case 'box':
       default:
-        enemyGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+        enemyGeometry = geometryPool.getBoxGeometry(0.8, 0.8, 0.8);
     }
 
-    // Create enemy material
-    const enemyMaterial = new THREE.MeshStandardMaterial({
-      color: this.color,
-      metalness: 0.2,
-      roughness: 0.7
-    });
+    // Get material from pool instead of creating new ones
+    const enemyMaterial = materialPool.getStandardMaterial(this.color, 0.2, 0.7);
 
     // Create main enemy mesh
     const enemyMesh = new THREE.Mesh(enemyGeometry, enemyMaterial);

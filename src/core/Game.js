@@ -16,6 +16,9 @@ import { CONFIG } from '../config/GameConfig.js';
 import { EventEmitter } from '../utils/EventEmitter.js';
 import { Logger } from '../utils/Logger.js';
 
+import { GeometryPool } from '../utils/GeometryPool.js';
+import { MaterialPool } from '../utils/MaterialPool.js';
+
 /**
  * Main Game class that orchestrates all game systems and components
  */
@@ -51,6 +54,8 @@ export class Game {
     this.upgradeSystem = new UpgradeSystem(this);
     this.combatSystem = new CombatSystem(this);
     this.sceneManager.game = this;
+    this.geometryPool = new GeometryPool();
+    this.materialPool = new MaterialPool();
 
     // Factories
     this.heroFactory = new HeroFactory(this);
@@ -72,6 +77,24 @@ export class Game {
     this.logger.info('Game instance created');
   }
 
+// Add this new method to Game.js
+enablePerformanceMode() {
+  // Set performance configuration
+  this.state.performanceMode = true;
+  
+  // Reduce particle counts and effect quality
+  this.state.particleMultiplier = 0.5; // 50% of normal particles
+  
+  // Set update frequencies
+  this.state.physicsUpdateFrequency = 2; // Every 2 frames
+  this.state.enemyUpdateFrequency = 3; // Every 3 frames
+  
+  // Initialize frame counter
+  this.frameCount = 0;
+  
+  this.logger.info('Performance mode enabled');
+}
+
   /**
    * Initialize game systems and start the game loop
    */
@@ -79,6 +102,12 @@ export class Game {
     this.logger.info('Initializing game');
 
     try {
+
+      this.enablePerformanceMode();
+
+      this.geometryPool = new GeometryPool();
+      this.materialPool = new MaterialPool();
+
       // Load assets
       await this.assetLoader.loadAll(progress => {
         // Update loading screen
@@ -153,6 +182,7 @@ export class Game {
    * Main game update loop
    * @param {number} timestamp - Current timestamp from requestAnimationFrame
    */
+  // Around line 287 in Game.js
   update(timestamp) {
     // Calculate delta time
     if (this.clock.lastTime === 0) {
@@ -169,61 +199,43 @@ export class Game {
     // Throttle updates to prevent excessive calculations at high framerates
     const scaledDelta = this.clock.delta * this.state.timeScale;
 
-    // Update all systems
-    this.physicsSystem.update(scaledDelta);
+    // Add update frequency control for systems
+    const PHYSICS_UPDATE_FREQUENCY = 2; // Physics updates every 2 frames
+    const ENEMY_UPDATE_FREQUENCY = 3; // Enemy AI updates every 3 frames
 
-    // Add this code to update the hero
+    // Always update core systems
+    this.renderSystem.render();
+
+    // Update the hero
     if (this.state.hero) {
       this.state.hero.update(scaledDelta);
     }
 
-    // Hero auto-attack system
-    if (this.state.hero && this.state.enemies.length > 0) {
-      // Find closest enemy in range
-      let closestEnemy = null;
-      let closestDistance = Infinity;
+    // Update physics less frequently - use frame counting
+    if (this.frameCount % PHYSICS_UPDATE_FREQUENCY === 0) {
+      this.physicsSystem.update(scaledDelta * PHYSICS_UPDATE_FREQUENCY);
+    }
 
-      this.state.enemies.forEach(enemy => {
-        if (enemy) {
-          const distance = this.state.hero.position.distanceTo(enemy.position);
-          if (distance < this.state.hero.upgradeStats.range.value && distance < closestDistance) {
-            closestDistance = distance;
-            closestEnemy = enemy;
-          }
+    // Stagger enemy updates (not all enemies need to update every frame)
+    if (this.state.enemies && this.state.enemies.length > 0) {
+      // Split enemies into groups based on frame count
+      const updateGroup = this.frameCount % ENEMY_UPDATE_FREQUENCY;
+
+      for (let i = updateGroup; i < this.state.enemies.length; i += ENEMY_UPDATE_FREQUENCY) {
+        const enemy = this.state.enemies[i];
+        if (enemy && typeof enemy.update === 'function') {
+          enemy.update(scaledDelta * ENEMY_UPDATE_FREQUENCY);
         }
-      });
-
-      // Attack if enemy found and attack cooldown is over
-      if (closestEnemy && this.state.hero.attackCooldown <= 0) {
-        this.state.hero.attack(closestEnemy);
       }
     }
 
-    // Update enemies
-    if (this.state.enemies && this.state.enemies.length > 0) {
-      this.state.enemies.forEach(enemy => {
-        if (enemy && typeof enemy.update === 'function') {
-          enemy.update(scaledDelta);
-        }
-      });
-    }
-
+    // Other systems update normally
     this.waveSystem.update(scaledDelta);
     this.combatSystem.update(scaledDelta);
     this.networkManager.update(scaledDelta);
 
-    // Get FPS for UI
-    if (this.renderSystem && this.renderSystem.fps) {
-      this.fps = this.renderSystem.fps;
-
-      // Update UI with current FPS every second
-      if (Math.floor(this.clock.elapsed) !== Math.floor(this.clock.elapsed - scaledDelta)) {
-        this.uiManager.updateFpsUI(this.fps);
-      }
-    }
-
-    // Render scene
-    this.renderSystem.render();
+    // Increment frame counter
+    this.frameCount = (this.frameCount || 0) + 1;
   }
 
   /**

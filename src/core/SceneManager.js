@@ -29,33 +29,36 @@ export class SceneManager {
   // src/core/SceneManager.js - modify the initialize method around line 30
   initialize() {
     this.logger.info('Initializing scene manager');
-    
+
     // Create scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb); // Sky blue
     this.scene.fog = new THREE.Fog(0x87ceeb, 20, 40);
-    
+
     // Create camera
     this.camera = new THREE.PerspectiveCamera(
-      75, 
-      window.innerWidth / window.innerHeight, 
-      0.1, 
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
       1000
     );
     this.camera.position.set(0, 15, 15);
     this.camera.lookAt(0, 0, 0);
-    
-    // Create renderer - CRITICAL FIX
-    this.renderer = new THREE.WebGLRenderer({ 
-      antialias: true,
-      alpha: false // Don't use alpha, it can cause black screen issues
+
+    // Lines ~48-58 in SceneManager.js
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: false, // Change from true to false
+      alpha: false,
+      powerPreference: 'high-performance' // Add this line
     });
-    this.renderer.setClearColor(0x87ceeb, 1); // Explicitly set clear color
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+
+    // Limit pixel ratio to avoid overwhelming GPU on high-DPI displays
+    this.renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio));
+
+    // Optimize shadow settings
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    
+    this.renderer.shadowMap.type = THREE.BasicShadowMap; // Change from PCFSoftShadowMap to BasicShadowMap
+
     // Position renderer canvas
     this.renderer.domElement.style.position = 'fixed';
     this.renderer.domElement.style.top = '0';
@@ -63,10 +66,10 @@ export class SceneManager {
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
     this.renderer.domElement.style.zIndex = '0'; // Under UI elements
-    
+
     // Add renderer to DOM at the beginning of the body
     document.body.insertBefore(this.renderer.domElement, document.body.firstChild);
-    
+
     // Add a test object to confirm rendering works
     // const testGeometry = new THREE.BoxGeometry(2, 2, 2);
     // const testMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
@@ -74,17 +77,17 @@ export class SceneManager {
     // testCube.position.set(0, 5, 0);
     // this.scene.add(testCube);
     // this.logger.info('Added test cube to scene');
-    
+
     // Set up lighting
     this.setupLighting();
-    
+
     // Set up window resize event listener
     window.addEventListener('resize', this.handleResize);
-    
+
     // Force immediate render to test
     this.renderer.render(this.scene, this.camera);
     this.logger.info('Performed test render');
-    
+
     this.logger.info('Scene manager initialized');
   }
   /**
@@ -228,5 +231,56 @@ export class SceneManager {
     });
 
     this.logger.info('Scene manager resources disposed');
+  }
+
+  /**
+ * Update frustum culling
+ * Checks which objects are in camera view and toggles visibility
+ */
+  updateFrustumCulling() {
+    if (!this.camera) return;
+
+    // Create frustum from camera
+    const frustum = new THREE.Frustum();
+    const projScreenMatrix = new THREE.Matrix4();
+
+    // Update projection matrix
+    this.camera.updateMatrixWorld();
+    projScreenMatrix.multiplyMatrices(
+      this.camera.projectionMatrix,
+      this.camera.matrixWorldInverse
+    );
+
+    frustum.setFromProjectionMatrix(projScreenMatrix);
+
+    // Check objects against frustum
+    Object.keys(this.objects).forEach(category => {
+      this.objects[category].forEach(object => {
+        // Skip objects without position
+        if (!object.position) return;
+
+        // Create bounding sphere for quick checking
+        if (!object.boundingSphere) {
+          // Estimate radius based on scale or size
+          const radius = object.scale ?
+            Math.max(object.scale.x, object.scale.y, object.scale.z) : 1;
+          object.boundingSphere = new THREE.Sphere(
+            object.position.clone(),
+            radius
+          );
+        } else {
+          // Update sphere position
+          object.boundingSphere.center.copy(object.position);
+        }
+
+        // Update visibility based on frustum intersection
+        const visible = frustum.intersectsSphere(object.boundingSphere);
+
+        // Only update if visibility changed
+        if (object.visible !== visible) {
+          object.visible = visible;
+        }
+      });
+    });
   }
 }
