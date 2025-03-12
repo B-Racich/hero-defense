@@ -13,7 +13,7 @@ export class NetworkManager {
     this.game = game;
     this.logger = new Logger('NetworkManager');
     this.events = new EventEmitter();
-    
+
     // Connection state
     this.socket = null;
     this.connected = false;
@@ -22,33 +22,33 @@ export class NetworkManager {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.lastSyncTime = 0;
-    
+
     // Bind methods to maintain context
     this.connect = this.connect.bind(this);
     this.disconnect = this.disconnect.bind(this);
     this.handleMessage = this.handleMessage.bind(this);
     this.handleError = this.handleError.bind(this);
     this.handleClose = this.handleClose.bind(this);
-    
+
     this.logger.info('Network manager created');
   }
-  
+
   /**
    * Initialize the network manager
    */
   initialize() {
     this.logger.info('Initializing network manager');
-    
+
     // Generate a unique player ID if not already set
     if (!this.playerId) {
       this.playerId = 'player_' + Math.random().toString(36).substring(2, 9);
       this.logger.debug(`Generated player ID: ${this.playerId}`);
     }
-    
+
     // Make game instance aware of otherPlayers
     this.game.otherPlayers = this.otherPlayers;
   }
-  
+
   /**
    * Connect to the game server
    * @param {string} serverUrl - Server URL to connect to
@@ -57,36 +57,36 @@ export class NetworkManager {
   connect(serverUrl) {
     return new Promise((resolve, reject) => {
       this.logger.info(`Connecting to server: ${serverUrl}`);
-      
+
       if (this.socket && this.connected) {
         this.logger.warn('Already connected, disconnecting first');
         this.disconnect();
       }
-      
+
       try {
         this.socket = new WebSocket(serverUrl);
-        
+
         // Set up event handlers
         this.socket.onopen = () => {
           this.connected = true;
           this.reconnectAttempts = 0;
           this.logger.info('Connected to server');
-          
+
           // Register player immediately
           this.registerPlayer();
-          
+
           resolve();
         };
-        
+
         this.socket.onmessage = event => {
           this.handleMessage(event.data);
         };
-        
+
         this.socket.onerror = error => {
           this.handleError(error);
           reject(error);
         };
-        
+
         this.socket.onclose = event => {
           this.handleClose(event);
         };
@@ -96,7 +96,7 @@ export class NetworkManager {
       }
     });
   }
-  
+
   /**
    * Register player with the server
    */
@@ -105,16 +105,16 @@ export class NetworkManager {
       this.logger.error('Not connected, cannot register player');
       return;
     }
-    
+
     this.logger.info('Registering player with server');
-    
+
     this.send({
       type: 'register_player',
       playerId: this.playerId,
       heroClass: this.game.state.heroClass
     });
   }
-  
+
   /**
    * Disconnect from the server
    */
@@ -123,22 +123,22 @@ export class NetworkManager {
       this.logger.warn('Not connected, cannot disconnect');
       return;
     }
-    
+
     this.logger.info('Disconnecting from server');
-    
+
     // Close the socket
     this.socket.close();
     this.socket = null;
     this.connected = false;
     this.otherPlayers = {};
-    
+
     // Make game instance aware of otherPlayers
     this.game.otherPlayers = this.otherPlayers;
-    
+
     // Emit disconnected event
     this.events.emit('disconnected');
   }
-  
+
   /**
    * Handle incoming messages from the server
    * @param {string} data - JSON message data
@@ -147,78 +147,111 @@ export class NetworkManager {
     try {
       const message = JSON.parse(data);
       this.logger.debug('Received message:', message.type);
-      
+
       switch (message.type) {
         case 'player_registered':
           this.logger.info(`Player registered: ${message.playerId}`);
-          this.events.emit('playerRegistered', { 
+          this.events.emit('playerRegistered', {
             playerId: message.playerId,
             playerCount: message.playerCount
           });
           break;
-          
+
         case 'player_joined':
           this.logger.info(`Player joined: ${message.playerId}`);
-          this.events.emit('playerJoined', { 
+          this.events.emit('playerJoined', {
             playerId: message.playerId,
             playerCount: message.playerCount
           });
           break;
-          
+
         case 'player_left':
           this.logger.info(`Player left: ${message.playerId}`);
-          
+
           // Remove from other players
           if (this.otherPlayers[message.playerId]) {
             delete this.otherPlayers[message.playerId];
-            
+
             // Make game instance aware of otherPlayers
             this.game.otherPlayers = this.otherPlayers;
           }
-          
-          this.events.emit('playerLeft', { 
+
+          this.events.emit('playerLeft', {
             playerId: message.playerId,
             playerCount: message.playerCount
           });
           break;
-          
+
         case 'player_disconnected':
           this.logger.info(`Player disconnected: ${message.playerId}`);
-          
+
           // Similar to player_left
           if (this.otherPlayers[message.playerId]) {
             delete this.otherPlayers[message.playerId];
-            
+
             // Make game instance aware of otherPlayers
             this.game.otherPlayers = this.otherPlayers;
           }
-          
-          this.events.emit('playerDisconnected', { 
+
+          this.events.emit('playerDisconnected', {
             playerId: message.playerId,
             playerCount: message.playerCount
           });
           break;
-          
+
         case 'game_state':
           this.processGameState(message.state);
           break;
-          
+
         case 'player_update':
           this.processPlayerUpdate(message.playerId, message.data);
           break;
-          
+
         case 'chat':
           this.events.emit('chatReceived', {
             playerId: message.playerId,
             message: message.message
           });
           break;
-          
+
         case 'error':
           this.logger.error(`Server error: ${message.message}`);
           this.events.emit('error', { message: message.message });
           break;
-          
+        case 'enemy_spawn':
+          // Create enemy locally based on server data
+          if (this.game.enemyFactory) {
+            const enemy = this.game.enemyFactory.createEnemy(message.enemyType, {
+              id: message.enemyId,
+              position: message.position
+            });
+
+            if (enemy) {
+              this.game.state.enemies.push(enemy);
+            }
+          }
+          break;
+
+        case 'enemy_position':
+          // Update local enemy position
+          const enemy = this.game.state.enemies.find(e => e.id === message.enemyId);
+          if (enemy) {
+            enemy.serverPosition = message.position;
+          }
+          break;
+
+        case 'enemy_remove':
+          // Remove local enemy
+          const enemyIndex = this.game.state.enemies.findIndex(e => e.id === message.enemyId);
+          if (enemyIndex !== -1) {
+            const removedEnemy = this.game.state.enemies[enemyIndex];
+            if (removedEnemy.mesh) {
+              this.game.sceneManager.removeFromScene(removedEnemy.mesh);
+            }
+            this.game.state.enemies.splice(enemyIndex, 1);
+          }
+          break;
+
         default:
           this.logger.warn(`Unknown message type: ${message.type}`);
       }
@@ -226,7 +259,7 @@ export class NetworkManager {
       this.logger.error('Error processing message:', error);
     }
   }
-  
+
   /**
    * Handle socket errors
    * @param {Error} error - Error object
@@ -235,7 +268,7 @@ export class NetworkManager {
     this.logger.error('WebSocket error:', error);
     this.events.emit('error', { message: 'Connection error' });
   }
-  
+
   /**
    * Handle socket close
    * @param {CloseEvent} event - Close event
@@ -243,7 +276,7 @@ export class NetworkManager {
   handleClose(event) {
     this.connected = false;
     this.logger.info(`Connection closed, code: ${event.code}, reason: ${event.reason}`);
-    
+
     // Try to reconnect if not a clean closure
     if (event.code !== 1000) {
       this.attemptReconnect();
@@ -251,7 +284,7 @@ export class NetworkManager {
       this.events.emit('disconnected');
     }
   }
-  
+
   /**
    * Attempt to reconnect to the server
    */
@@ -261,17 +294,17 @@ export class NetworkManager {
       this.events.emit('disconnected');
       return;
     }
-    
+
     this.reconnectAttempts++;
-    
+
     const delay = Math.pow(2, this.reconnectAttempts) * 1000;
     this.logger.info(`Attempting reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-    
+
     setTimeout(() => {
       if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
         return; // Already reconnecting
       }
-      
+
       // Try to reconnect
       this.connect(this.socket.url).then(() => {
         // Re-register player upon reconnect
@@ -282,7 +315,7 @@ export class NetworkManager {
       });
     }, delay);
   }
-  
+
   /**
    * Process game state updates
    * @param {Object} state - Game state data
@@ -293,16 +326,59 @@ export class NetworkManager {
       this.game.state.wave = state.wave;
       this.game.uiManager.updateWaveUI(state.wave);
     }
-    
+
     // Handle enemy state updates (simplified - actual implementation would be more complex)
     if (state.enemies) {
       // Process enemy updates
     }
-    
+
     // Emit game state updated event
     this.events.emit('gameStateUpdated', state);
   }
-  
+
+  /**
+   * Request enemy spawn from server
+   * @param {string} type - Enemy type
+   * @param {Object} position - Spawn position
+   */
+  requestEnemySpawn(type, position) {
+    if (!this.connected) return;
+
+    this.send({
+      type: 'spawn_enemy',
+      type: type,
+      position: position
+    });
+  }
+
+  /**
+   * Update enemy position on server
+   * @param {string} id - Enemy ID
+   * @param {Object} position - New position
+   */
+  updateEnemyPosition(id, position) {
+    if (!this.connected) return;
+
+    this.send({
+      type: 'enemy_update',
+      id: id,
+      position: position
+    });
+  }
+
+  /**
+   * Notify server of enemy removal
+   * @param {string} id - Enemy ID
+   */
+  notifyEnemyRemoved(id) {
+    if (!this.connected) return;
+
+    this.send({
+      type: 'remove_enemy',
+      id: id
+    });
+  }
+
   /**
    * Process player update
    * @param {string} playerId - Player ID
@@ -310,7 +386,7 @@ export class NetworkManager {
    */
   processPlayerUpdate(playerId, data) {
     if (playerId === this.playerId) return; // Ignore updates for local player
-    
+
     // Create or update other player data
     if (!this.otherPlayers[playerId]) {
       this.otherPlayers[playerId] = {
@@ -318,16 +394,16 @@ export class NetworkManager {
         heroClass: data.heroClass,
         hero: null
       };
-      
+
       // Create hero for other player if heroClass is provided
       if (data.heroClass && this.game.heroFactory) {
         this.otherPlayers[playerId].hero = this.game.heroFactory.createHero(
-          data.heroClass, 
+          data.heroClass,
           false // Not local player
         );
       }
     }
-    
+
     // Update hero position and rotation if hero exists
     if (this.otherPlayers[playerId].hero && data.position) {
       this.otherPlayers[playerId].hero.position.set(
@@ -335,7 +411,7 @@ export class NetworkManager {
         data.position.y,
         data.position.z
       );
-      
+
       if (data.rotation) {
         this.otherPlayers[playerId].hero.rotation.set(
           data.rotation.x,
@@ -343,23 +419,23 @@ export class NetworkManager {
           data.rotation.z
         );
       }
-      
+
       // Update mesh position
       if (this.otherPlayers[playerId].hero.mesh) {
         this.otherPlayers[playerId].hero.mesh.position.copy(
           this.otherPlayers[playerId].hero.position
         );
-        
+
         this.otherPlayers[playerId].hero.mesh.rotation.copy(
           this.otherPlayers[playerId].hero.rotation
         );
       }
     }
-    
+
     // Make game instance aware of otherPlayers
     this.game.otherPlayers = this.otherPlayers;
   }
-  
+
   /**
    * Send local player state to server
    */
@@ -367,11 +443,11 @@ export class NetworkManager {
     if (!this.connected || !this.game.state.hero) {
       return;
     }
-    
+
     // Get hero stats
     const hero = this.game.state.hero;
     const heroStats = hero.getStats();
-    
+
     this.send({
       type: 'player_update',
       data: {
@@ -391,7 +467,7 @@ export class NetworkManager {
       }
     });
   }
-  
+
   /**
    * Send game state update to other players
    */
@@ -399,20 +475,20 @@ export class NetworkManager {
     if (!this.connected) {
       return;
     }
-    
+
     // Get relevant game state
     const state = {
       wave: this.game.state.wave,
       waveInProgress: this.game.state.waveInProgress,
       enemiesDefeated: this.game.state.enemiesDefeated
     };
-    
+
     this.send({
       type: 'game_state',
       state: state
     });
   }
-  
+
   /**
    * Send chat message
    * @param {string} message - Chat message to send
@@ -422,13 +498,13 @@ export class NetworkManager {
       this.logger.error('Not connected, cannot send chat');
       return;
     }
-    
+
     this.send({
       type: 'chat',
       message: message
     });
   }
-  
+
   /**
    * Send game over notification
    */
@@ -436,7 +512,7 @@ export class NetworkManager {
     if (!this.connected) {
       return;
     }
-    
+
     this.send({
       type: 'game_state',
       state: {
@@ -446,7 +522,7 @@ export class NetworkManager {
       }
     });
   }
-  
+
   /**
    * Send data to the server
    * @param {Object} data - Data to send
@@ -456,14 +532,14 @@ export class NetworkManager {
       this.logger.error('Not connected, cannot send data');
       return;
     }
-    
+
     try {
       this.socket.send(JSON.stringify(data));
     } catch (error) {
       this.logger.error('Error sending data:', error);
     }
   }
-  
+
   /**
    * Update network state
    * @param {number} delta - Time since last update in seconds
@@ -472,18 +548,18 @@ export class NetworkManager {
     if (!this.connected) {
       return;
     }
-    
+
     // Periodically sync player data
     const now = Date.now();
     const syncInterval = this.game.CONFIG?.multiplayer?.syncInterval || 100;
-    
+
     if (now - this.lastSyncTime > syncInterval) {
       // Send player update
       this.sendPlayerUpdate();
-      
+
       // Send game state too
       this.sendGameState();
-      
+
       this.lastSyncTime = now;
     }
   }

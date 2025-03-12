@@ -107,7 +107,7 @@ export class Game {
     try {
 
       // Initialize quality controller first
-      this.qualityController.initialize('medium');
+      this.qualityController.initialize('low');
 
       // this.enablePerformanceMode();
 

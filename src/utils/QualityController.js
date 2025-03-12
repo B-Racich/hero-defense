@@ -89,7 +89,7 @@ export class QualityController {
    * Initialize with default quality level
    * @param {string} level - Initial quality level
    */
-  initialize(level = 'medium') {
+  initialize(level = 'low') {
     this.logger.info(`Initializing quality controller with level: ${level}`);
     
     // Set initial level

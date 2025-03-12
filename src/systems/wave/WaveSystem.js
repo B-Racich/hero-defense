@@ -117,33 +117,28 @@ export class WaveSystem {
    */
   spawnEnemy() {
     if (!this.waveInProgress || this.waveEnemiesLeft <= 0) return;
-
-    // Check if enemyFactory is available
-    if (!this.enemyFactory) {
-      this.logger.error('Enemy factory not initialized');
-      this.enemyFactory = new EnemyFactory(this.game);
-    }
-
-    // Randomly select an enemy type from available types for this wave
+  
+    // Randomly select an enemy type
     const randomType = this.enemyTypes[Math.floor(Math.random() * this.enemyTypes.length)];
-
-    // Create enemy
-    const enemy = this.enemyFactory.createEnemy(randomType);
-
-    // Add to game state
-    this.game.state.enemies.push(enemy);
-
+    
+    // Generate spawn position
+    const spawnPosition = {
+      x: Math.random() * 3 - 1.5,
+      y: 0.4,
+      z: -12
+    };
+  
+    if (this.game.networkManager.connected) {
+      // Request enemy spawn from server
+      this.game.networkManager.requestEnemySpawn(randomType, spawnPosition);
+    } else {
+      // Local fallback for solo play
+      const enemy = this.enemyFactory.createEnemy(randomType);
+      this.game.state.enemies.push(enemy);
+    }
+  
     // Decrement enemies left counter
     this.waveEnemiesLeft--;
-
-    this.logger.debug(`Spawned enemy: ${randomType}, remaining: ${this.waveEnemiesLeft}`);
-
-    // Emit enemy spawned event
-    this.game.events.emit('enemySpawned', {
-      enemy: enemy,
-      wave: this.currentWave,
-      remaining: this.waveEnemiesLeft
-    });
   }
 
   /**
