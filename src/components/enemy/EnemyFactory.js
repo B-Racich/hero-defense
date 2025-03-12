@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { Enemy } from './Enemy.js';
 import { Logger } from '../../utils/Logger.js';
 import { CONFIG } from '../../config/GameConfig.js';

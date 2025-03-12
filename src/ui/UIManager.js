@@ -43,6 +43,15 @@ export class UIManager {
     this.hideGameUI();
     
     this.logger.info('UI manager initialized');
+    
+    // Explicitly force the loading screen to be hidden - this is a new line
+    this.hideLoadingScreen();
+    
+    // Show multiplayer panel explicitly - this is a new line
+    setTimeout(() => {
+      this.showMultiplayerPanel();
+      this.logger.info('Multiplayer panel should now be visible');
+    }, 100);
   }
   
   /**
@@ -106,6 +115,24 @@ export class UIManager {
     this.elements.gameOverPanel = document.getElementById('gameOverPanel');
     if (!this.elements.gameOverPanel) {
       this.elements.gameOverPanel = this.createGameOverPanel();
+    }
+    
+    // Log the status of important elements
+    this.logger.debug(`Loading screen element exists: ${!!this.elements.loadingScreen}`);
+    this.logger.debug(`Multiplayer panel element exists: ${!!this.elements.multiplayerPanel}`);
+  }
+  
+  /**
+   * Explicitly hide the loading screen
+   * This is a new method
+   */
+  hideLoadingScreen() {
+    if (this.elements.loadingScreen) {
+      this.logger.info('Explicitly hiding loading screen');
+      this.elements.loadingScreen.style.opacity = '0';
+      this.elements.loadingScreen.style.display = 'none';
+    } else {
+      this.logger.warn('Loading screen element not found when trying to hide');
     }
   }
   
@@ -846,6 +873,8 @@ export class UIManager {
    * @param {number} progress - Progress value (0-1)
    */
   updateLoadingProgress(progress) {
+    this.logger.debug(`Updating loading progress: ${progress}`);
+    
     if (this.elements.loadingBar) {
       this.elements.loadingBar.style.width = `${progress * 100}%`;
     }
@@ -856,12 +885,12 @@ export class UIManager {
     
     if (progress >= 1 && this.elements.loadingScreen) {
       // Hide loading screen
+      this.logger.info('Progress is 100%, hiding loading screen');
+      this.elements.loadingScreen.style.opacity = '0';
+      
       setTimeout(() => {
-        this.elements.loadingScreen.style.opacity = '0';
-        
-        setTimeout(() => {
-          this.elements.loadingScreen.style.display = 'none';
-        }, 500);
+        this.elements.loadingScreen.style.display = 'none';
+        this.logger.info('Loading screen should now be completely hidden');
       }, 500);
     }
   }
@@ -914,7 +943,20 @@ export class UIManager {
    * Show multiplayer panel
    */
   showMultiplayerPanel() {
+    this.logger.info('Showing multiplayer panel');
+    
+    if (!this.elements.multiplayerPanel) {
+      this.logger.warn('Multiplayer panel not found, creating it');
+      this.elements.multiplayerPanel = this.createMultiplayerPanel();
+    }
+    
     this.showPanel(this.elements.multiplayerPanel);
+    
+    if (this.elements.multiplayerPanel) {
+      // Force visibility
+      this.elements.multiplayerPanel.style.display = 'block';
+      this.logger.info('Forced multiplayer panel visibility');
+    }
   }
   
   /**

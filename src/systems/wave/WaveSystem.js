@@ -1,5 +1,6 @@
 import { Logger } from '../../utils/Logger.js';
 import { CONFIG } from '../../config/GameConfig.js';
+import { EnemyFactory } from '../../components/enemy/EnemyFactory.js';
 
 /**
  * Manages enemy waves, spawning, and progression
@@ -21,6 +22,9 @@ export class WaveSystem {
     this.spawnInterval = 2000;
     this.enemyTypes = [];
     
+    // Initialize the enemyFactory immediately
+    this.enemyFactory = new EnemyFactory(this.game);
+    
     this.logger.debug('Wave system created');
   }
   
@@ -28,10 +32,6 @@ export class WaveSystem {
    * Initialize the wave system
    */
   initialize() {
-    // Import EnemyFactory
-    const { EnemyFactory } = require('../../components/enemy/EnemyFactory.js');
-    this.enemyFactory = new EnemyFactory(this.game);
-    
     this.logger.info('Wave system initialized');
   }
   
@@ -115,6 +115,12 @@ export class WaveSystem {
    */
   spawnEnemy() {
     if (!this.waveInProgress || this.waveEnemiesLeft <= 0) return;
+    
+    // Check if enemyFactory is available
+    if (!this.enemyFactory) {
+      this.logger.error('Enemy factory not initialized');
+      this.enemyFactory = new EnemyFactory(this.game);
+    }
     
     // Randomly select an enemy type from available types for this wave
     const randomType = this.enemyTypes[Math.floor(Math.random() * this.enemyTypes.length)];

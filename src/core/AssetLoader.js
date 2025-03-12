@@ -42,6 +42,13 @@ export class AssetLoader {
     if (this.loadQueue.length === 0) {
       this.logger.info('No assets to load');
       this.ready = true;
+      
+      // Call the progress callback with 100% completion
+      // This is the fix - ensure the loading screen completes even when no assets are loaded
+      if (progressCallback) {
+        progressCallback(1);
+      }
+      
       return Promise.resolve();
     }
     
