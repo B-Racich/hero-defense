@@ -31,29 +31,31 @@ export class NetworkManager {
     this.handleError = this.handleError.bind(this);
     this.handleClose = this.handleClose.bind(this);
 
+    this.processedMessageIds = new Set();
+
     this.logger.info('Network manager created');
   }
 
   // Add after the constructor in NetworkManager.js
-debugEntities() {
-  console.log("--- DEBUG ENTITIES ---");
-  console.log(`Hero exists: ${!!this.game.state.hero}`);
-  if (this.game.state.hero && this.game.state.hero.mesh) {
-    console.log(`Hero mesh exists: ${!!this.game.state.hero.mesh}`);
-    console.log(`Hero position: ${JSON.stringify(this.game.state.hero.position)}`);
-    console.log(`Hero in scene: ${this.game.sceneManager.scene.children.includes(this.game.state.hero.mesh)}`);
-  }
-  
-  console.log(`Enemies count: ${this.game.state.enemies.length}`);
-  this.game.state.enemies.forEach((enemy, i) => {
-    console.log(`Enemy ${i} mesh exists: ${!!enemy.mesh}`);
-    if (enemy.mesh) {
-      console.log(`Enemy ${i} in scene: ${this.game.sceneManager.scene.children.includes(enemy.mesh)}`);
+  debugEntities() {
+    console.log("--- DEBUG ENTITIES ---");
+    console.log(`Hero exists: ${!!this.game.state.hero}`);
+    if (this.game.state.hero && this.game.state.hero.mesh) {
+      console.log(`Hero mesh exists: ${!!this.game.state.hero.mesh}`);
+      console.log(`Hero position: ${JSON.stringify(this.game.state.hero.position)}`);
+      console.log(`Hero in scene: ${this.game.sceneManager.scene.children.includes(this.game.state.hero.mesh)}`);
     }
-  });
-  
-  console.log(`Scene total children: ${this.game.sceneManager.scene.children.length}`);
-}
+
+    console.log(`Enemies count: ${this.game.state.enemies.length}`);
+    this.game.state.enemies.forEach((enemy, i) => {
+      console.log(`Enemy ${i} mesh exists: ${!!enemy.mesh}`);
+      if (enemy.mesh) {
+        console.log(`Enemy ${i} in scene: ${this.game.sceneManager.scene.children.includes(enemy.mesh)}`);
+      }
+    });
+
+    console.log(`Scene total children: ${this.game.sceneManager.scene.children.length}`);
+  }
 
   /**
    * Initialize the network manager
@@ -171,6 +173,15 @@ debugEntities() {
       const message = JSON.parse(data);
       this.logger.debug('Received message:', message.type);
 
+      const messageId = message.id || message.enemyId || (message.type + Date.now());
+      if (this.processedMessageIds.has(messageId)) return;
+      this.processedMessageIds.add(messageId);
+
+      if(this.processedMessageIds.size > 100) {
+        const oldest = Array.from(this.processedMessageIds)[0];
+        this.processedMessageIds.delete(oldest);
+      }
+
       switch (message.type) {
         case 'player_registered':
           this.logger.info(`Player registered: ${message.playerId}`);
@@ -243,12 +254,14 @@ debugEntities() {
           break;
         // Replace the enemy_spawn case in handleMessage method in NetworkManager.js
         case 'enemy_spawn':
+          console.log(`Spawning enemy: ${message.enemyType} at position:`, message.position);
+
           // Create enemy locally based on server data
           if (this.game && this.game.state) {
             const position = new THREE.Vector3(
               message.position.x || 0,
               message.position.y || 0.4,
-              message.position.z || 0
+              message.position.z || -12
             );
 
             // Use the enemy factory from the game's waveSystem
@@ -262,15 +275,20 @@ debugEntities() {
               if (enemy) {
                 // Make sure mesh is created and added to scene
                 if (!enemy.mesh) {
+                  console.log(`Creating mesh for enemy ${message.enemyId}`);
                   enemy.mesh = enemy.createMesh();
                   this.game.sceneManager.addToScene(enemy.mesh, 'enemies');
                 }
 
-                this.game.state.enemies.push(enemy);
-                console.log(`Enemy spawned: ${message.enemyType} (${message.enemyId})`);
+                // Ensure position is set correctly on both enemy and mesh
+                enemy.position.copy(position);
+                if (enemy.mesh) {
+                  enemy.mesh.position.copy(position);
+                  enemy.mesh.visible = true;
+                }
 
-                // Debug entities
-                this.debugEntities();
+                this.game.state.enemies.push(enemy);
+                console.log(`Enemy spawned and added to game: ${message.enemyType} (${message.enemyId})`);
               } else {
                 console.error("Failed to create enemy");
               }

@@ -47,67 +47,61 @@ export class Enemy {
    * Create the 3D mesh for the enemy
    * @returns {THREE.Group} The enemy mesh group
    */
-  // Add to src/components/enemy/Enemy.js in the createMesh method:
-createMesh() {
-  // Ensure we're using the geometry pool properly
-  let enemyGeometry;
-  if (this.game && this.game.geometryPool) {
-    switch (this.shape) {
-      case 'sphere':
-        enemyGeometry = this.game.geometryPool.getSphereGeometry(0.5 * this.scale);
-        break;
-      case 'tetrahedron':
-        enemyGeometry = this.game.geometryPool.getTetrahedronGeometry(0.6 * this.scale);
-        break;
-      case 'cone':
-        enemyGeometry = this.game.geometryPool.getConeGeometry(0.5 * this.scale, 0.8 * this.scale);
-        break;
-      case 'box':
-      default:
-        enemyGeometry = this.game.geometryPool.getBoxGeometry(0.8 * this.scale, 0.8 * this.scale, 0.8 * this.scale);
+  createMesh() {
+    // Ensure we're using the geometry pool properly
+    let enemyGeometry;
+    if (this.game && this.game.geometryPool) {
+      switch (this.shape) {
+        case 'sphere':
+          enemyGeometry = this.game.geometryPool.getSphereGeometry(0.5 * this.scale);
+          break;
+        case 'tetrahedron':
+          enemyGeometry = this.game.geometryPool.getTetrahedronGeometry(0.6 * this.scale);
+          break;
+        case 'cone':
+          enemyGeometry = this.game.geometryPool.getConeGeometry(0.5 * this.scale, 0.8 * this.scale);
+          break;
+        case 'box':
+        default:
+          enemyGeometry = this.game.geometryPool.getBoxGeometry(0.8 * this.scale, 0.8 * this.scale, 0.8 * this.scale);
+      }
+    } else {
+      // Fallback if geometry pool isn't available
+      enemyGeometry = new THREE.BoxGeometry(0.8 * this.scale, 0.8 * this.scale, 0.8 * this.scale);
     }
-  } else {
-    // Fallback if geometry pool isn't available
-    enemyGeometry = new THREE.BoxGeometry(0.8 * this.scale, 0.8 * this.scale, 0.8 * this.scale);
+
+    // Create brightly colored material for better visibility
+    const enemyMaterial = new THREE.MeshBasicMaterial({
+      color: this.color || 0xff0000,
+      wireframe: false
+    });
+
+    // Create main enemy mesh
+    const enemyMesh = new THREE.Mesh(enemyGeometry, enemyMaterial);
+    enemyMesh.castShadow = true;
+    enemyMesh.receiveShadow = true;
+
+    // Create group to hold enemy components
+    const enemyGroup = new THREE.Group();
+
+    // Position at specified position, ensuring y is above ground
+    enemyGroup.position.copy(this.position);
+    if (enemyGroup.position.y < 0.4) {
+      enemyGroup.position.y = 0.4; // Force minimum height
+    }
+
+    enemyGroup.add(enemyMesh);
+
+    // Add health bar
+    const healthBarGroup = this.createHealthBar();
+    healthBarGroup.position.y = 1.5 * this.scale;
+    enemyGroup.add(healthBarGroup);
+
+    // Store reference to mesh
+    this.mesh = enemyGroup;
+
+    return enemyGroup;
   }
-
-  // Create brightly colored material for better visibility
-  const enemyMaterial = new THREE.MeshBasicMaterial({
-    color: this.color || 0xff0000,
-    wireframe: false
-  });
-
-  // Create main enemy mesh
-  const enemyMesh = new THREE.Mesh(enemyGeometry, enemyMaterial);
-  enemyMesh.castShadow = true;
-  enemyMesh.receiveShadow = true;
-
-  // Create group to hold enemy components
-  const enemyGroup = new THREE.Group();
-  
-  // Position at specified position, ensuring y is above ground
-  enemyGroup.position.copy(this.position);
-  if (enemyGroup.position.y < 0.4) {
-    enemyGroup.position.y = 0.4; // Force minimum height
-  }
-  
-  enemyGroup.add(enemyMesh);
-
-  // Add health bar
-  const healthBarGroup = this.createHealthBar();
-  healthBarGroup.position.y = 1.5 * this.scale;
-  enemyGroup.add(healthBarGroup);
-
-  // Store reference to mesh
-  this.mesh = enemyGroup;
-
-  // Add visual debugging aid - axis helper
-  const axisHelper = new THREE.AxesHelper(1);
-  enemyGroup.add(axisHelper);
-
-  return enemyGroup;
-}
-
   /**
    * Create a health bar for the enemy
    * @returns {THREE.Group} Health bar group
@@ -150,29 +144,40 @@ createMesh() {
  * Update enemy logic
  * @param {number} delta - Time since last update in seconds
  */
+  // Replace the update method in Enemy.js with this improved version
   update(delta) {
-    if (!this.mesh) return;
+    if (!this.mesh) {
+      // Create mesh if missing
+      this.mesh = this.createMesh();
+      if (this.game && this.game.sceneManager) {
+        this.game.sceneManager.addToScene(this.mesh, 'enemies');
+      }
+      return;
+    }
 
     // Force visibility
     this.mesh.visible = true;
-    
+
     // Ensure position is above ground
     if (this.mesh.position.y < 0.4) {
       this.mesh.position.y = 0.4;
     }
-  
+
     // Convert speed to be more noticeable for debugging
     let adjustedSpeed = this.speed * 5; // Multiply speed for clearer movement
-    
+
     // Move enemy forward with adjusted speed
     this.mesh.position.z += adjustedSpeed * delta * 60;
     this.position.copy(this.mesh.position);
-  
+
     // Update health bar to face camera
-    if (this.healthBar && this.healthBar.parent && this.game && this.game.sceneManager && this.game.sceneManager.camera) {
-      this.healthBar.parent.lookAt(this.game.sceneManager.camera.position);
+    if (this.mesh.children.length > 1 && this.game && this.game.sceneManager && this.game.sceneManager.camera) {
+      const healthBarGroup = this.mesh.children[1]; // Assuming health bar is the second child
+      if (healthBarGroup) {
+        healthBarGroup.lookAt(this.game.sceneManager.camera.position);
+      }
     }
-  
+
     // Debug visualization - make enemy pulsate
     if (this.mesh.children[0]) {
       const pulseFactor = 1 + 0.2 * Math.sin(Date.now() / 200);
@@ -185,8 +190,6 @@ createMesh() {
       if (this.game && this.game.state && this.game.state.hero) {
         // Deal damage equal to enemy's damage stat
         const damageToHero = this.damage;
-
-        this.logger.info(`Enemy ${this.id} reached end zone - dealing ${damageToHero} damage to hero`);
 
         // Apply damage directly to hero
         this.game.state.hero.takeDamage(damageToHero, this);

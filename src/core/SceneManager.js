@@ -27,6 +27,7 @@ export class SceneManager {
    * Initialize scene, camera, and renderer
    */
   // src/core/SceneManager.js - modify the initialize method around line 30
+  // Update the initialize method in SceneManager.js
   initialize() {
     this.logger.info('Initializing scene manager');
 
@@ -35,48 +36,48 @@ export class SceneManager {
     this.scene.background = new THREE.Color(0x87ceeb); // Sky blue
     this.scene.fog = new THREE.Fog(0x87ceeb, 20, 40);
 
-    // Create camera
+    // Create camera with better view of the game field
     this.camera = new THREE.PerspectiveCamera(
-      75,
+      60, // Wider field of view
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
-    this.camera.position.set(0, 15, 15);
+
+    // Position camera to see more of the play area
+    this.camera.position.set(0, 15, 20);
     this.camera.lookAt(0, 0, 0);
 
-    // Lines ~48-58 in SceneManager.js
+    // Create renderer with performance optimizations
     this.renderer = new THREE.WebGLRenderer({
-      antialias: false, // Change from true to false
+      antialias: false,
       alpha: false,
-      powerPreference: 'high-performance' // Add this line
+      powerPreference: 'high-performance'
     });
 
-    // Limit pixel ratio to avoid overwhelming GPU on high-DPI displays
-    this.renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio));
+    // Set renderer size to full window
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
 
-    // Optimize shadow settings
+    // Set pixel ratio (cap at 1.5 to avoid performance issues on high-DPI displays)
+    this.renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
+
+    // Configure shadows
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.BasicShadowMap; // Change from PCFSoftShadowMap to BasicShadowMap
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
 
-    // Position renderer canvas
+    // Style renderer element
     this.renderer.domElement.style.position = 'fixed';
     this.renderer.domElement.style.top = '0';
     this.renderer.domElement.style.left = '0';
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
-    this.renderer.domElement.style.zIndex = '0'; // Under UI elements
+    this.renderer.domElement.style.zIndex = '0';
 
-    // Add renderer to DOM at the beginning of the body
+    // Store a reference to the game on the canvas for debugging
+    this.renderer.domElement.__game__ = window.game;
+
+    // Add renderer to DOM
     document.body.insertBefore(this.renderer.domElement, document.body.firstChild);
-
-    // Add a test object to confirm rendering works
-    // const testGeometry = new THREE.BoxGeometry(2, 2, 2);
-    // const testMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-    // const testCube = new THREE.Mesh(testGeometry, testMaterial);
-    // testCube.position.set(0, 5, 0);
-    // this.scene.add(testCube);
-    // this.logger.info('Added test cube to scene');
 
     // Set up lighting
     this.setupLighting();
@@ -84,11 +85,14 @@ export class SceneManager {
     // Set up window resize event listener
     window.addEventListener('resize', this.handleResize);
 
-    // Force immediate render to test
+    // Force immediate render
     this.renderer.render(this.scene, this.camera);
-    this.logger.info('Performed test render');
+    this.logger.info('Initial render completed');
 
     this.logger.info('Scene manager initialized');
+
+    // Make camera globally accessible for debugging
+    window.gameCamera = this.camera;
   }
   /**
    * Set up scene lighting

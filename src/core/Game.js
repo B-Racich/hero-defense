@@ -104,35 +104,36 @@ export class Game {
   // src/core/Game.js - Around line 90
   async initialize() {
     this.logger.info('Initializing game');
-
-// Add immediately after initialize() starts in Game.js
-document.getElementById('loadingScreen').style.display = 'none';
-
+  
+    // Add immediately after initialize() starts in Game.js
+    document.getElementById('loadingScreen').style.display = 'none';
+  
     try {
       this.geometryPool = new GeometryPool();
       this.materialPool = new MaterialPool();
-
+  
       // Load assets
       await this.assetLoader.loadAll(progress => {
         // Update loading screen
         this.uiManager.updateLoadingProgress(progress);
       });
-
+  
       // Initialize scene manager first
       this.sceneManager.initialize();
-
+  
       this.camera = this.sceneManager.camera;
-
+  
       // Initialize render system
       this.renderSystem.initialize();
-
+  
       // Now initialize quality controller after renderer exists
       this.qualityController.initialize('low');
-
+  
       // Rest of initialization
       this.physicsSystem.initialize();
       this.inputManager.initialize();
-
+  
+      // Force UI display
       setTimeout(() => {
         if (this.uiManager) {
           this.uiManager.hideLoadingScreen();
@@ -140,8 +141,6 @@ document.getElementById('loadingScreen').style.display = 'none';
           this.logger.info('Forcing UI display after initialization');
         }
       }, 1000);
-
-      // More code follows...
     } catch (error) {
       this.logger.error('Failed to initialize game:', error);
     }
