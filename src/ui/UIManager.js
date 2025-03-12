@@ -75,30 +75,36 @@ export class UIManager {
       this.logger.info('Multiplayer panel should now be visible');
     }, 100);
 
-    // Add to the end of the initialize method in UIManager.js
-    // Create debug button
+    // Add debug button
     const debugButton = document.createElement('button');
-    debugButton.textContent = "Debug Game";
+    debugButton.textContent = "Debug Entities";
     debugButton.style.position = 'fixed';
-    debugButton.style.top = '10px';
-    debugButton.style.left = '10px';
+    debugButton.style.bottom = '10px';
+    debugButton.style.left = '50%';
+    debugButton.style.transform = 'translateX(-50%)';
     debugButton.style.zIndex = '9999';
+    debugButton.style.padding = '8px 16px';
+    debugButton.style.backgroundColor = '#ff0000';
+    debugButton.style.color = 'white';
+    debugButton.style.border = 'none';
+    debugButton.style.borderRadius = '4px';
+    debugButton.style.cursor = 'pointer';
+
     debugButton.addEventListener('click', () => {
-      if (this.game && this.game.networkManager) {
-        this.game.networkManager.debugEntities();
+      if (this.game) {
+        this.game.debugEntities();
 
-        // Force recreate hero if missing
-        if (!this.game.state.hero || !this.game.state.hero.mesh) {
-          console.log("Recreating hero...");
-          this.game.state.hero = this.game.heroFactory.createHero(this.game.state.heroClass || 'warrior', true);
-
-          // Make sure hero is added to scene
-          if (this.game.state.hero && this.game.state.hero.mesh) {
-            this.game.sceneManager.addToScene(this.game.state.hero.mesh, 'heroes');
-          }
+        // Force visibility of all entities
+        if (this.game.sceneManager) {
+          Object.keys(this.game.sceneManager.objects).forEach(category => {
+            this.game.sceneManager.objects[category].forEach(obj => {
+              if (obj) obj.visible = true;
+            });
+          });
         }
       }
     });
+
     document.body.appendChild(debugButton);
   }
 

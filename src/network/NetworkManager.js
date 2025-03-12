@@ -298,13 +298,24 @@ export class NetworkManager {
           }
           break;
 
-        case 'enemy_position':
-          // Update local enemy position
-          const enemy = this.game.state.enemies.find(e => e.id === message.enemyId);
-          if (enemy) {
-            enemy.serverPosition = message.position;
-          }
-          break;
+          case 'enemy_position':
+            // Update local enemy position
+            const enemy = this.game.state.enemies.find(e => e.id === message.enemyId);
+            if (enemy) {
+              // Create proper THREE.Vector3 from position data
+              enemy.serverPosition = new THREE.Vector3(
+                message.position.x || 0,
+                message.position.y || 0.4,
+                message.position.z || 0
+              );
+              
+              // Also update the mesh position directly
+              if (enemy.mesh) {
+                enemy.mesh.position.copy(enemy.serverPosition);
+                enemy.mesh.visible = true; // Force visibility
+              }
+            }
+            break;
 
         case 'enemy_remove':
           // Remove local enemy

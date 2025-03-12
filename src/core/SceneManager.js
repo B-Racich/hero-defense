@@ -45,7 +45,7 @@ export class SceneManager {
     );
 
     // Position camera to see more of the play area
-    this.camera.position.set(0, 15, 20);
+    this.camera.position.set(0, 12, 20);
     this.camera.lookAt(0, 0, 0);
 
     // Create renderer with performance optimizations
@@ -243,26 +243,37 @@ export class SceneManager {
  */
   updateFrustumCulling() {
     if (!this.camera) return;
-
+  
+    // TEMPORARILY DISABLE FRUSTUM CULLING - FORCE ALL OBJECTS VISIBLE
+    Object.keys(this.objects).forEach(category => {
+      this.objects[category].forEach(object => {
+        if (object) {
+          object.visible = true;
+        }
+      });
+    });
+  
+    // Original frustum culling code commented out for debugging
+    /*
     // Create frustum from camera
     const frustum = new THREE.Frustum();
     const projScreenMatrix = new THREE.Matrix4();
-
+  
     // Update projection matrix
     this.camera.updateMatrixWorld();
     projScreenMatrix.multiplyMatrices(
       this.camera.projectionMatrix,
       this.camera.matrixWorldInverse
     );
-
+  
     frustum.setFromProjectionMatrix(projScreenMatrix);
-
+  
     // Check objects against frustum
     Object.keys(this.objects).forEach(category => {
       this.objects[category].forEach(object => {
         // Skip objects without position
         if (!object.position) return;
-
+  
         // Create bounding sphere for quick checking
         if (!object.boundingSphere) {
           // Estimate radius based on scale or size
@@ -276,15 +287,16 @@ export class SceneManager {
           // Update sphere position
           object.boundingSphere.center.copy(object.position);
         }
-
+  
         // Update visibility based on frustum intersection
         const visible = frustum.intersectsSphere(object.boundingSphere);
-
+  
         // Only update if visibility changed
         if (object.visible !== visible) {
           object.visible = visible;
         }
       });
     });
+    */
   }
 }

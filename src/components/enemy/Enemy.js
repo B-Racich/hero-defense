@@ -154,10 +154,26 @@ export class Enemy {
       }
       return;
     }
-
-    // Force visibility
+  
+    // Force visibility - IMPORTANT
     this.mesh.visible = true;
-
+  
+    // Use server position if available
+    if (this.serverPosition) {
+      // Apply server position directly
+      this.position.copy(this.serverPosition);
+      this.mesh.position.copy(this.serverPosition);
+      this.serverPosition = null; // Clear after use
+    } else {
+      // Otherwise use local movement
+      // Convert speed to be more noticeable for debugging
+      let adjustedSpeed = this.speed * 5; // Multiply speed for clearer movement
+  
+      // Move enemy forward with adjusted speed
+      this.mesh.position.z += adjustedSpeed * delta * 60;
+      this.position.copy(this.mesh.position);
+    }
+  
     // Ensure position is above ground
     if (this.mesh.position.y < 0.4) {
       this.mesh.position.y = 0.4;

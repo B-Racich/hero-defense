@@ -31,8 +31,8 @@ export class QualityController {
         effectsEnabled: false,
         antialiasing: false,
         textureQuality: 'low',
-        physicsUpdateFrequency: 3,
-        enemyUpdateFrequency: 4,
+        physicsUpdateFrequency: 1,
+        enemyUpdateFrequency: 1,
         outputEncoding: 'Linear',
         toneMapping: 'None',
         geometryDetail: 0.5
@@ -46,8 +46,8 @@ export class QualityController {
         effectsEnabled: true,
         antialiasing: false,
         textureQuality: 'medium',
-        physicsUpdateFrequency: 2,
-        enemyUpdateFrequency: 3,
+        physicsUpdateFrequency: 1,
+        enemyUpdateFrequency: 1,
         outputEncoding: 'sRGB',
         toneMapping: 'Reinhard',
         geometryDetail: 0.75

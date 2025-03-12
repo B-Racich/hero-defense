@@ -172,65 +172,87 @@ export class Game {
    * Main game update loop
    * @param {number} timestamp - Current timestamp from requestAnimationFrame
    */
-  // Around line 287 in Game.js
   update(timestamp) {
     // Calculate delta time
     if (this.clock.lastTime === 0) {
       this.clock.lastTime = timestamp;
     }
-
+  
     this.clock.delta = (timestamp - this.clock.lastTime) / 1000;
     this.clock.elapsed += this.clock.delta;
     this.clock.lastTime = timestamp;
-
+  
     // Skip update if game is not active
     if (!this.state.gameActive) return;
-
+  
     // Throttle updates to prevent excessive calculations at high framerates
     const scaledDelta = this.clock.delta * this.state.timeScale;
-
-    // Add update frequency control for systems
-    // Get update frequencies from quality settings
-    const PHYSICS_UPDATE_FREQUENCY = this.state.physicsUpdateFrequency || 2;
-    const ENEMY_UPDATE_FREQUENCY = this.state.enemyUpdateFrequency || 3;
-
+  
+    // IMPORTANT: Force frequent updates for debugging
+    const PHYSICS_UPDATE_FREQUENCY = 1; // Update every frame
+    const ENEMY_UPDATE_FREQUENCY = 1;   // Update every frame
+  
     // Always update core systems
     this.renderSystem.render();
-
-    // Update the hero
+  
+    // Always update the hero
     if (this.state.hero) {
       this.state.hero.update(scaledDelta);
     }
-
-    // Update physics less frequently - use frame counting
-    if (this.frameCount % PHYSICS_UPDATE_FREQUENCY === 0) {
-      this.physicsSystem.update(scaledDelta * PHYSICS_UPDATE_FREQUENCY);
-    }
-
-    // Stagger enemy updates (not all enemies need to update every frame)
+  
+    // Update physics every frame during debugging
+    this.physicsSystem.update(scaledDelta);
+  
+    // Update ALL enemies every frame during debugging
     if (this.state.enemies && this.state.enemies.length > 0) {
-      // Split enemies into groups based on frame count
-      const updateGroup = this.frameCount % ENEMY_UPDATE_FREQUENCY;
-
-      for (let i = updateGroup; i < this.state.enemies.length; i += ENEMY_UPDATE_FREQUENCY) {
+      for (let i = 0; i < this.state.enemies.length; i++) {
         const enemy = this.state.enemies[i];
         if (enemy && typeof enemy.update === 'function') {
-          enemy.update(scaledDelta * ENEMY_UPDATE_FREQUENCY);
+          enemy.update(scaledDelta);
         }
       }
-    }
-
-    if (this.state.enemies && this.state.enemies.length > 0) {
+      
+      // Log enemy count for debugging
       console.log(`Processing ${this.state.enemies.length} enemies`);
     }
-
+  
     // Other systems update normally
     this.waveSystem.update(scaledDelta);
     this.combatSystem.update(scaledDelta);
     this.networkManager.update(scaledDelta);
-
+  
     // Increment frame counter
     this.frameCount = (this.frameCount || 0) + 1;
+  }
+
+  debugEntities() {
+    console.log("======= ENTITY DEBUG =======");
+    
+    // Check hero
+    if (this.state.hero) {
+      console.log(`Hero exists: Type=${this.state.hero.type}, Position=${JSON.stringify(this.state.hero.position)}`);
+      console.log(`Hero mesh exists: ${!!this.state.hero.mesh}, Visible: ${this.state.hero.mesh?.visible}`);
+    } else {
+      console.log("Hero not created!");
+    }
+    
+    // Check enemies
+    console.log(`Total enemies: ${this.state.enemies.length}`);
+    this.state.enemies.forEach((enemy, i) => {
+      if (i < 5) { // Only log first 5 for brevity
+        console.log(`Enemy #${i}: Type=${enemy.type}, Position=${JSON.stringify(enemy.position)}`);
+        console.log(`  Mesh exists: ${!!enemy.mesh}, Visible: ${enemy.mesh?.visible}`);
+      }
+    });
+    
+    // Check scene objects
+    if (this.sceneManager && this.sceneManager.scene) {
+      console.log(`Total scene children: ${this.sceneManager.scene.children.length}`);
+      console.log(`Heroes tracked: ${this.sceneManager.objects.heroes.length}`);
+      console.log(`Enemies tracked: ${this.sceneManager.objects.enemies.length}`);
+    }
+    
+    console.log("============================");
   }
 
   /**
